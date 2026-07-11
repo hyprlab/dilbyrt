@@ -401,8 +401,37 @@ h1, h2, h3 { margin: 0; }
 .check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 8px; }
 .check-grid .check { margin-bottom: 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 9px; }
 
-.receipt-thumb { margin-top: 8px; display: flex; flex-direction: column; gap: 6px; }
-.receipt-thumb img { max-width: 100%; max-height: 220px; border-radius: 10px; border: 1px solid var(--border); object-fit: contain; background: var(--panel-2); }
+.receipt-thumb { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
+.receipt-thumb-btn { position: relative; padding: 0; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-2); cursor: zoom-in; overflow: hidden; display: block; }
+.receipt-thumb-btn img { max-width: 100%; max-height: 220px; object-fit: contain; display: block; margin: 0 auto; }
+.receipt-thumb-hint { position: absolute; left: 0; right: 0; bottom: 0; display: flex; align-items: center; justify-content: center; gap: 6px; padding: 6px; font-size: 12px; font-weight: 600; color: #fff; background: linear-gradient(transparent, rgba(0,0,0,.6)); }
+.receipt-thumb-hint .icon { width: 1em; height: 1em; }
+.receipt-thumb-actions, .scan-preview-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
+
+/* ── sticky pinned receipt viewer ─────────────────────────────────────── */
+.receipt-pin { position: sticky; top: 60px; z-index: 15; height: 25vh; min-height: 150px; margin-bottom: 16px;
+  display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border);
+  border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
+.receipt-pin-body { flex: 1; min-height: 0; overflow: auto; background: var(--panel-2); cursor: grab; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
+.receipt-pin-body.grabbing { cursor: grabbing; }
+.receipt-pin-img { width: 200%; max-width: none; display: block; user-select: none; -webkit-user-drag: none; }
+.receipt-pin-bar { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-top: 1px solid var(--border); flex-shrink: 0; }
+.receipt-pin-label { font-size: 12px; }
+.pin-btn { width: 32px; height: 30px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 7px; background: var(--panel-2); color: var(--text); cursor: pointer; font-size: 16px; font-weight: 700; line-height: 1; }
+.pin-btn:hover { background: var(--brand-soft); }
+.pin-btn .icon { width: 16px; height: 16px; }
+
+/* ── lightbox (full-screen receipt) ───────────────────────────────────── */
+.lightbox { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; background: rgba(10,12,20,.92); }
+.lightbox-body { flex: 1; min-height: 0; overflow: auto; text-align: center; cursor: grab; -webkit-overflow-scrolling: touch; }
+.lightbox-body.grabbing { cursor: grabbing; }
+.lightbox-img { display: block; margin: 0 auto; max-width: none; user-select: none; -webkit-user-drag: none; }
+.lightbox-bar { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 12px; background: rgba(0,0,0,.4); flex-shrink: 0; }
+.lightbox-bar .pin-btn { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.2); color: #fff; }
+.lightbox-bar .pin-btn:hover { background: rgba(255,255,255,.25); }
+
+.add-line-btn { width: 100%; margin-top: 12px; border-style: dashed; color: var(--access); justify-content: center; }
+.add-line-btn:hover { border-color: var(--brand); }
 
 /* ── receipt detail ───────────────────────────────────────────────────── */
 .detail-cols { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }

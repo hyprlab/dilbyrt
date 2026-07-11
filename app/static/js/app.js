@@ -248,16 +248,20 @@
       form._itemsSum = sum;
     }
 
-    // Line item add / remove (event-delegated).
+    // Manual line item add / remove. Any [data-add-item] button (header or the
+    // full-width button below the table) appends a blank row.
     var tpl = document.getElementById("item-row-template");
     var bodyEl = document.getElementById("items-body");
-    var addBtn = document.getElementById("add-item");
-    if (addBtn && tpl && bodyEl) addBtn.addEventListener("click", function () {
+    function addItemRow() {
+      if (!tpl || !bodyEl) return;
       bodyEl.appendChild(tpl.content.cloneNode(true));
       recalc();
       var rows = bodyEl.querySelectorAll(".item-row");
       var last = rows[rows.length - 1];
       if (last) { var inp = last.querySelector("input"); if (inp) inp.focus(); }
+    }
+    form.querySelectorAll("[data-add-item]").forEach(function (b) {
+      b.addEventListener("click", addItemRow);
     });
     form.addEventListener("click", function (e) {
       var rm = e.target.closest("[data-remove-item]");
@@ -293,6 +297,26 @@
     }
     [subEl, taxEl, grandEl].forEach(function (el) { if (el) el.addEventListener("input", checkTotals); });
 
+    // Optional tax rate → auto-compute tax (and grand total) from subtotal.
+    // When a rate is present, editing the subtotal or the rate recomputes the
+    // tax. Clear the rate to enter tax manually.
+    var rateEl = form.querySelector("[data-tax-rate]");
+    function recomputeTax() {
+      if (!rateEl || !subEl) return;
+      var raw = rateEl.value.trim();
+      if (!raw) return;                       // no rate → leave tax manual
+      var rate = num(raw);
+      if (!(rate >= 0)) return;
+      var sub = num(subEl.value);
+      var tax = Math.round(sub * rate) / 100; // sub * rate/100, to cents
+      if (taxEl) taxEl.value = tax.toFixed(2);
+      if (grandEl) grandEl.value = (sub + tax).toFixed(2);
+      checkTotals();
+    }
+    if (rateEl) rateEl.addEventListener("input", recomputeTax);
+    if (subEl) subEl.addEventListener("input", recomputeTax);
+    recomputeTax();
+
     // Split mode panels.
     form.querySelectorAll("[data-split-radio]").forEach(function (r) {
       r.addEventListener("change", function () {
@@ -307,6 +331,80 @@
 
     recalc();
     checkTotals();
+  })();
+
+  /* ── receipt viewer: pin-to-top (sticky, pannable) + lightbox ─────────
+     Lets the user keep a magnified receipt on screen to correct OCR errors
+     without re-enlarging. `window.setReceiptSrc(url)` is called by the scan
+     flow so a freshly-scanned photo becomes viewable too. */
+  (function () {
+    var pin = document.getElementById("receipt-pin");
+    var lb = document.getElementById("receipt-lightbox");
+    if (!pin && !lb) return;
+    var pinImg = document.getElementById("receipt-pin-img");
+    var pinBody = document.getElementById("receipt-pin-body");
+    var lbImg = document.getElementById("lightbox-img");
+    var lbBody = document.getElementById("lightbox-body");
+    var currentSrc = "";
+    var pinPct = 200, lbPct = 100;
+
+    var seed = document.querySelector("[data-receipt-src]");
+    if (seed && seed.getAttribute("data-receipt-src")) currentSrc = seed.getAttribute("data-receipt-src");
+    window.setReceiptSrc = function (url) { if (url) currentSrc = url; };
+
+    function openPin() {
+      if (!pin || !currentSrc) return;
+      pinImg.src = currentSrc; pinPct = 200; pinImg.style.width = pinPct + "%";
+      pin.hidden = false;
+      pin.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+    function openLightbox() {
+      if (!lb || !currentSrc) return;
+      lbImg.src = currentSrc; lbPct = 100; lbImg.style.width = lbPct + "%";
+      lb.hidden = false; document.body.style.overflow = "hidden";
+    }
+    function closeLightbox() { if (lb) { lb.hidden = true; document.body.style.overflow = ""; } }
+
+    document.addEventListener("click", function (e) {
+      if (e.target.closest("[data-receipt-open]")) { e.preventDefault(); openLightbox(); }
+      else if (e.target.closest("[data-receipt-pin]")) { e.preventDefault(); openPin(); }
+    });
+    var pinClose = document.getElementById("receipt-pin-close");
+    if (pinClose) pinClose.addEventListener("click", function () { pin.hidden = true; });
+    var lbClose = document.getElementById("lightbox-close");
+    if (lbClose) lbClose.addEventListener("click", closeLightbox);
+    var lbPin = document.getElementById("lightbox-pin");
+    if (lbPin) lbPin.addEventListener("click", function () { closeLightbox(); openPin(); });
+
+    if (pin) pin.querySelectorAll("[data-pin-zoom]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        pinPct = Math.max(100, Math.min(400, pinPct + (b.getAttribute("data-pin-zoom") === "in" ? 60 : -60)));
+        pinImg.style.width = pinPct + "%";
+      });
+    });
+    if (lb) lb.querySelectorAll("[data-lb-zoom]").forEach(function (b) {
+      b.addEventListener("click", function () {
+        lbPct = Math.max(50, Math.min(500, lbPct + (b.getAttribute("data-lb-zoom") === "in" ? 40 : -40)));
+        lbImg.style.width = lbPct + "%";
+      });
+    });
+
+    function enablePan(el) {
+      if (!el) return;
+      var down = false, sx, sy, sl, st;
+      el.addEventListener("mousedown", function (e) {
+        down = true; sx = e.clientX; sy = e.clientY; sl = el.scrollLeft; st = el.scrollTop;
+        el.classList.add("grabbing"); e.preventDefault();
+      });
+      window.addEventListener("mousemove", function (e) {
+        if (!down) return;
+        el.scrollLeft = sl - (e.clientX - sx);
+        el.scrollTop = st - (e.clientY - sy);
+      });
+      window.addEventListener("mouseup", function () { down = false; el.classList.remove("grabbing"); });
+    }
+    enablePan(pinBody); enablePan(lbBody);
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape" && lb && !lb.hidden) closeLightbox(); });
   })();
 
   /* ── scan drop label + submit spinner ─────────────────────────────── */
@@ -346,6 +444,8 @@
             var url = URL.createObjectURL(file);
             previewImg.src = url;
             previewImg.dataset.url = url;
+            previewImg.setAttribute("data-receipt-src", url);
+            if (window.setReceiptSrc) window.setReceiptSrc(url);   // enable pin/lightbox
             preview.hidden = false;
           }
         }
@@ -401,6 +501,8 @@
         var s = receiptForm.querySelector('[name="stored_image"]'); if (s) s.value = data.stored_image || "";
         var o = receiptForm.querySelector('[name="ocr_text"]'); if (o) o.value = data.ocr_text || "";
       }
+      // Point the pin/lightbox at the stored (server) image once scanned.
+      if (window.setReceiptSrc && data.image_url) window.setReceiptSrc(data.image_url);
       rebuildItems(f.items);
       if (status) { status.hidden = false; status.className = "scan-status ok"; status.textContent = data.message || "Scanned — review the fields below."; }
       var details = receiptForm && receiptForm.querySelector(".form-cols");

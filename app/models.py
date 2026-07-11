@@ -98,6 +98,7 @@ class Receipt(db.Model):
 
     subtotal = db.Column(db.Float, default=0.0)
     tax = db.Column(db.Float, default=0.0)
+    tax_rate = db.Column(db.Float)   # optional %; auto-computes tax from subtotal
     grand_total = db.Column(db.Float, default=0.0)
     currency = db.Column(db.String(8), default="USD")
 

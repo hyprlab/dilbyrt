@@ -313,6 +313,7 @@ def receipt_edit(rid):
     prefill = {
         "vendor_name": r.vendor_name, "city": r.city, "state": r.state,
         "subtotal": r.subtotal or "", "tax": r.tax or "",
+        "tax_rate": r.tax_rate if r.tax_rate not in (None, "") else "",
         "grand_total": r.grand_total or "",
         "purchased_at": r.purchased_at.strftime("%Y-%m-%dT%H:%M") if r.purchased_at else "",
         "items": [{"description": it.description, "qty": it.qty, "cost": it.cost,
@@ -335,6 +336,11 @@ def _save_receipt(r):
     r.subtotal = _money("subtotal")
     r.tax = _money("tax")
     r.grand_total = _money("grand_total")
+    rate_raw = (request.form.get("tax_rate") or "").replace("%", "").strip()
+    try:
+        r.tax_rate = round(float(rate_raw), 4) if rate_raw else None
+    except ValueError:
+        r.tax_rate = None
     r.notes = _f("notes")
     r.split_mode = _f("split_mode", "single") or "single"
     r.entity_id = request.form.get("entity_id", type=int)

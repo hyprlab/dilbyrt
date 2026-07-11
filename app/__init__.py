@@ -187,10 +187,33 @@ def create_app():
         except OperationalError as e:
             if "already exists" not in str(e).lower():
                 raise
+        _migrate_columns(app)
         _seed_site(app)
         _seed_admin(app)
 
     return app
+
+
+def _migrate_columns(app):
+    """Add columns introduced after a DB was first created. SQLite's
+    create_all() only creates missing *tables*, not missing columns, so new
+    nullable columns need an explicit ALTER TABLE. Idempotent + race-tolerant."""
+    from sqlalchemy import text
+    wanted = {
+        "receipt": [("tax_rate", "FLOAT")],
+    }
+    try:
+        with db.engine.begin() as conn:
+            for table, cols in wanted.items():
+                existing = {row[1] for row in conn.execute(
+                    text(f"PRAGMA table_info({table})"))}
+                for name, coltype in cols:
+                    if name not in existing:
+                        conn.execute(text(
+                            f"ALTER TABLE {table} ADD COLUMN {name} {coltype}"))
+                        app.logger.info("Added column %s.%s", table, name)
+    except Exception:
+        app.logger.exception("column migration failed")
 
 
 def _seed_site(app):

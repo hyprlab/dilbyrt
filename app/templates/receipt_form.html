@@ -4,6 +4,22 @@
 {% block top_actions %}<a class="btn" href="{{ url_for('main.receipts') }}">{{ icon('arrow-left') }}<span>Back</span></a>{% endblock %}
 {% block content %}
 
+{# Sticky magnified receipt viewer — pins to just below the topbar (~25vh)
+   so you can pan the receipt while correcting fields. Toggled via "Pin to top". #}
+<div class="receipt-pin" id="receipt-pin" hidden>
+  <div class="receipt-pin-body" id="receipt-pin-body">
+    <img class="receipt-pin-img" id="receipt-pin-img" alt="Receipt" draggable="false">
+  </div>
+  <div class="receipt-pin-bar">
+    <span class="receipt-pin-label muted">Receipt · drag to pan</span>
+    <span class="spacer"></span>
+    <button type="button" class="pin-btn" data-pin-zoom="out" aria-label="Zoom out">−</button>
+    <button type="button" class="pin-btn" data-pin-zoom="in" aria-label="Zoom in">+</button>
+    <button type="button" class="pin-btn" data-receipt-open aria-label="Full screen">{{ icon('search') }}</button>
+    <button type="button" class="pin-btn" id="receipt-pin-close" aria-label="Unpin">{{ icon('x') }}</button>
+  </div>
+</div>
+
 {% if not receipt %}
 <div class="card scan-card">
   <div class="card-head"><h2>{{ icon('camera') }} Scan a receipt</h2></div>
@@ -17,10 +33,14 @@
     </label>
     <figure class="scan-preview" id="scan-preview" hidden>
       <div class="scan-preview-imgwrap">
-        <img id="scan-preview-img" alt="Receipt preview">
+        <img id="scan-preview-img" alt="Receipt preview" data-receipt-src="">
         <button type="button" class="scan-preview-remove" id="scan-remove" aria-label="Remove photo and retake">{{ icon('x') }}</button>
       </div>
       <figcaption class="muted">Preview — remove to retake, or scan &amp; auto-fill below.</figcaption>
+      <div class="scan-preview-actions">
+        <button type="button" class="btn btn-sm" data-receipt-open>{{ icon('search') }}<span>Enlarge</span></button>
+        <button type="button" class="btn btn-sm" data-receipt-pin>{{ icon('image') }}<span>Pin to top</span></button>
+      </div>
     </figure>
     <p class="scan-status" id="scan-status" hidden></p>
     <button class="btn btn-primary" type="submit" id="scan-submit">{{ icon('wand') }}<span>Scan &amp; auto-fill</span></button>
@@ -83,22 +103,33 @@
           <input name="subtotal" type="text" inputmode="decimal" data-total="subtotal" value="{{ prefill.subtotal if prefill.subtotal not in (None, '') else '' }}" placeholder="0.00">
         </label>
         <label>
+          <span>Tax rate (%) <span class="muted">optional</span></span>
+          <input name="tax_rate" type="text" inputmode="decimal" data-tax-rate value="{{ prefill.tax_rate if prefill.tax_rate not in (None, '') else '' }}" placeholder="e.g. 7">
+        </label>
+      </div>
+      <div class="row">
+        <label>
           <span>Tax</span>
           <input name="tax" type="text" inputmode="decimal" data-total="tax" value="{{ prefill.tax if prefill.tax not in (None, '') else '' }}" placeholder="0.00">
         </label>
+        <label>
+          <span>Grand total <span class="req">*</span></span>
+          <input name="grand_total" type="text" inputmode="decimal" data-total="grand" value="{{ prefill.grand_total if prefill.grand_total not in (None, '') else '' }}" placeholder="0.00" required>
+        </label>
       </div>
-      <label>
-        <span>Grand total <span class="req">*</span></span>
-        <input name="grand_total" type="text" inputmode="decimal" data-total="grand" value="{{ prefill.grand_total if prefill.grand_total not in (None, '') else '' }}" placeholder="0.00" required>
-      </label>
+      <p class="muted hint" data-tax-rate-hint>Enter a tax rate to auto-calculate tax (and the grand total) from the subtotal.</p>
       <p class="muted hint" data-sum-hint hidden></p>
 
       {% if stored_image %}
       <div class="receipt-thumb">
-        <span class="muted">Attached image</span>
-        <a href="{{ url_for('main.upload', filename=stored_image) }}" target="_blank" rel="noopener">
-          <img src="{{ url_for('main.upload', filename=stored_image) }}" alt="Receipt image">
-        </a>
+        <span class="muted">Attached receipt</span>
+        <button type="button" class="receipt-thumb-btn" data-receipt-open>
+          <img src="{{ url_for('main.upload', filename=stored_image) }}" alt="Receipt" data-receipt-src="{{ url_for('main.upload', filename=stored_image) }}">
+          <span class="receipt-thumb-hint">{{ icon('search') }} Tap to enlarge</span>
+        </button>
+        <div class="receipt-thumb-actions">
+          <button type="button" class="btn btn-sm" data-receipt-pin>{{ icon('image') }}<span>Pin to top</span></button>
+        </div>
       </div>
       {% elif receipt %}
       <label>
@@ -155,9 +186,9 @@
 
   <div class="card">
     <div class="card-head"><h2>Line items</h2>
-      <div class="card-head-actions"><button type="button" class="btn btn-sm" id="add-item">{{ icon('plus') }}<span>Add item</span></button></div>
+      <div class="card-head-actions"><button type="button" class="btn btn-sm" data-add-item>{{ icon('plus') }}<span>Add item</span></button></div>
     </div>
-    <p class="muted hint">Add each item and its cost. In <strong>Itemized</strong> split mode you can bill each item to a different business.</p>
+    <p class="muted hint">Add each item and its cost — type them in by hand or start from a scan. In <strong>Itemized</strong> split mode you can bill each item to a different business.</p>
     <div class="table-wrap">
     <table class="tbl items-table" id="items-table">
       <thead>
@@ -183,6 +214,7 @@
       </tbody>
     </table>
     </div>
+    <button type="button" class="btn add-line-btn" data-add-item>{{ icon('plus') }}<span>Add line item</span></button>
     <p class="items-foot muted">Items subtotal: <strong data-items-sum>$0.00</strong> <button type="button" class="link-btn" id="apply-items-subtotal">Use as subtotal</button></p>
   </div>
 
@@ -209,6 +241,18 @@
   </div>
 </div>
 {% endif %}
+
+<div class="lightbox" id="receipt-lightbox" hidden>
+  <div class="lightbox-body" id="lightbox-body">
+    <img class="lightbox-img" id="lightbox-img" alt="Receipt" draggable="false">
+  </div>
+  <div class="lightbox-bar">
+    <button type="button" class="pin-btn" data-lb-zoom="out" aria-label="Zoom out">−</button>
+    <button type="button" class="pin-btn" data-lb-zoom="in" aria-label="Zoom in">+</button>
+    <button type="button" class="btn btn-sm" id="lightbox-pin">{{ icon('image') }}<span>Pin to top</span></button>
+    <button type="button" class="btn btn-sm" id="lightbox-close">{{ icon('x') }}<span>Close</span></button>
+  </div>
+</div>
 
 <template id="item-row-template">
   <tr class="item-row">
