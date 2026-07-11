@@ -230,6 +230,22 @@
     var form = document.querySelector(".receipt-form");
     if (!form) return;
 
+    // Warn before losing unsaved work to a refresh / tab close / browser-back.
+    // The browser shows its own native "Reload site? / Leave?" confirm (its
+    // text isn't customisable). Only nags once the form has been touched, and
+    // never on intentional leaves (Save, Cancel, Back, or a fresh scan submit).
+    var dirty = false, leaving = false;
+    form.addEventListener("input", function () { dirty = true; });
+    form.addEventListener("change", function () { dirty = true; });
+    var scanFormEl = document.getElementById("scan-form");
+    if (scanFormEl) scanFormEl.addEventListener("change", function () { dirty = true; });
+    document.addEventListener("submit", function () { leaving = true; });
+    document.querySelectorAll(".top-actions a[href], .sticky-actions a[href]:not([data-open-modal])")
+      .forEach(function (a) { a.addEventListener("click", function () { leaving = true; }); });
+    window.addEventListener("beforeunload", function (e) {
+      if (dirty && !leaving) { e.preventDefault(); e.returnValue = ""; }
+    });
+
     function money(n) { return "$" + (isFinite(n) ? n : 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
     function num(v) { var n = parseFloat((v || "").toString().replace(/[$,]/g, "")); return isFinite(n) ? n : 0; }
 
