@@ -185,8 +185,14 @@ h1, h2, h3 { margin: 0; }
 .check span { display: inline-flex; align-items: center; gap: 7px; }
 .switch-row { font-weight: 600; }
 
-.sticky-actions { position: sticky; bottom: 0; background: color-mix(in srgb, var(--bg) 85%, transparent);
-  backdrop-filter: blur(8px); padding: 14px 0; margin-top: 4px; border-top: 1px solid var(--border); z-index: 5; }
+/* Always pinned to the bottom of the content area (fixed, not sticky) so the
+   Save bar is visible regardless of scroll position. Offset by the sidebar on
+   desktop; full-width on mobile (see the 900px media query). */
+.sticky-actions { position: fixed; left: var(--sidebar-w); right: 0; bottom: 0; z-index: 20;
+  background: var(--panel); border-top: 1px solid var(--border);
+  padding: 12px var(--content-px); margin: 0; box-shadow: 0 -4px 16px rgba(0,0,0,.08); }
+/* Reserve space so the last card isn't hidden behind the fixed bar. */
+.receipt-form { padding-bottom: 76px; }
 
 /* ── tables ───────────────────────────────────────────────────────────── */
 .table-wrap { overflow-x: auto; margin: 0 -6px; }
@@ -520,6 +526,7 @@ h1, h2, h3 { margin: 0; }
   .login-split { grid-template-columns: 1fr; }
   .login-hero { min-height: 200px; }
   .item-entity-col { width: 120px; }
+  .sticky-actions { left: 0; }   /* sidebar is off-canvas — span full width */
 }
 @media (max-width: 560px) {
   .stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
