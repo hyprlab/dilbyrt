@@ -412,8 +412,8 @@ h1, h2, h3 { margin: 0; }
 /* Sticks below the sticky topbar with a gap so it never collides with the
    header while scrolling. `top` = header height (~63px) + margin. */
 .receipt-pin { position: sticky; top: 76px; scroll-margin-top: 80px; z-index: 15;
-  height: 35vh; height: 35svh;   /* svh is stable — vh jumps as mobile chrome shows/hides on scroll */
-  min-height: 160px; margin-bottom: 16px;
+  height: 220px;   /* fixed px — viewport-relative units jump as mobile chrome shows/hides */
+  margin-bottom: 16px;
   display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
 .receipt-pin-body { flex: 1; min-height: 0; overflow: auto; background: var(--panel-2); cursor: grab; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
