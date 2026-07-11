@@ -409,7 +409,9 @@ h1, h2, h3 { margin: 0; }
 .receipt-thumb-actions, .scan-preview-actions { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; }
 
 /* ── sticky pinned receipt viewer ─────────────────────────────────────── */
-.receipt-pin { position: sticky; top: 60px; z-index: 15; height: 25vh; min-height: 150px; margin-bottom: 16px;
+/* Sticks below the sticky topbar with a gap so it never collides with the
+   header while scrolling. `top` = header height (~63px) + margin. */
+.receipt-pin { position: sticky; top: 76px; scroll-margin-top: 80px; z-index: 15; height: 35vh; min-height: 160px; margin-bottom: 16px;
   display: flex; flex-direction: column; background: var(--panel); border: 1px solid var(--border);
   border-radius: var(--radius); box-shadow: var(--shadow); overflow: hidden; }
 .receipt-pin-body { flex: 1; min-height: 0; overflow: auto; background: var(--panel-2); cursor: grab; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; }
