@@ -1,0 +1,28 @@
+services:
+  dilbyrt:
+    build: .
+    container_name: dilbyrt
+    ports:
+      - "8099:8000"
+    volumes:
+      - ./data:/data
+      # To enable live Google Sheets sync, drop your service-account key at
+      # ./data/google_sa.json and uncomment DILBYRT_GOOGLE_SA_KEY below.
+    environment:
+      - DILBYRT_SECRET_KEY=${DILBYRT_SECRET_KEY:?DILBYRT_SECRET_KEY must be set in .env}
+      - DILBYRT_ADMIN_USERNAME=${DILBYRT_ADMIN_USERNAME:-admin}
+      - DILBYRT_ADMIN_PASSWORD=${DILBYRT_ADMIN_PASSWORD:?DILBYRT_ADMIN_PASSWORD must be set in .env}
+      - DILBYRT_ADMIN_EMAIL=${DILBYRT_ADMIN_EMAIL:-admin@example.com}
+      # - DILBYRT_GOOGLE_SA_KEY=/data/google_sa.json
+      # Cookies are served WITHOUT the Secure flag by default so the app works
+      # over plain HTTP (e.g. http://<server-ip>:8099). Browsers drop Secure
+      # cookies over HTTP on non-localhost hosts, which breaks login with a
+      # "CSRF session token is missing" error. When you put Dilbyrt behind
+      # HTTPS (a reverse proxy such as Caddy/nginx/Cloudflare), set this to 1.
+      - DILBYRT_SECURE_COOKIES=${DILBYRT_SECURE_COOKIES:-0}
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

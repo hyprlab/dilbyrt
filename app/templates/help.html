@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Help · {{ site.site_name }}{% endblock %}
+{% block heading %}Help &amp; tips{% endblock %}
+{% block content %}
+<div class="card prose">
+  <h2>Adding a receipt</h2>
+  <ol>
+    <li>Go to <strong>Receipts → New receipt</strong>.</li>
+    {% if ocr_available %}
+    <li>Under <strong>Scan a receipt</strong>, tap to take a photo (on a phone it opens the camera) or choose an image, then hit <strong>Scan &amp; auto-fill</strong>.</li>
+    <li>Dilbyrt reads the image and fills in the vendor, date, location, totals, and line items. <strong>Review everything</strong> and fix anything it misread.</li>
+    {% else %}
+    <li>OCR isn't enabled on this server, so attach the image and type the fields in yourself.</li>
+    {% endif %}
+    <li>Set how the cost is split (see below), then <strong>Save receipt</strong>.</li>
+  </ol>
+
+  <h2>Splitting a receipt between businesses</h2>
+  <p>First add your businesses under <strong>Businesses</strong>. Then on any receipt pick one of:</p>
+  <ul>
+    <li><strong>One business</strong> — the whole total goes to a single business.</li>
+    <li><strong>Split evenly</strong> — pick two (or more) businesses and the total is divided equally (this is your 50/50).</li>
+    <li><strong>Itemized</strong> — bill each line item to its own business using the <em>Bill to</em> column.</li>
+  </ul>
+  <p>The dashboard and each receipt show the resulting per-business totals.</p>
+
+  <h2>Getting your data into Google Sheets</h2>
+  <p>On the <strong>Receipts</strong> page use <strong>Export</strong>:</p>
+  <ul>
+    <li><strong>CSV</strong> or <strong>Excel</strong> — download the file, then in Google Drive choose <em>New → File upload</em> and open it with Google Sheets. Each business allocation is its own row so per-business totals add up.</li>
+    <li><strong>Push to Google Sheet</strong> — appears when an admin has connected a Google service-account key in Settings. It writes straight into your sheet so you can edit on a Chromebook. See the README for the one-time setup.</li>
+  </ul>
+
+  <h2>Roles</h2>
+  <ul>
+    <li><strong>Viewer</strong> — browse receipts and run exports.</li>
+    <li><strong>Editor</strong> — everything a viewer can do, plus add/edit/delete receipts and businesses.</li>
+    <li><strong>Admin</strong> — everything, plus manage users and settings.</li>
+  </ul>
+</div>
+{% endblock %}

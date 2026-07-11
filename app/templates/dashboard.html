@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Dashboard · {{ site.site_name }}{% endblock %}
+{% block heading %}Dashboard{% endblock %}
+{% block top_actions %}
+  {% if can_edit %}<a class="btn btn-primary" href="{{ url_for('main.receipt_new') }}">{{ icon('plus') }}<span>New receipt</span></a>{% endif %}
+{% endblock %}
+{% block content %}
+<div class="stat-grid">
+  <div class="stat-card">
+    <div class="stat-icon">{{ icon('receipt') }}</div>
+    <div class="stat-value">{{ receipt_count }}</div>
+    <div class="stat-label">Receipts</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">{{ icon('dollar-sign') }}</div>
+    <div class="stat-value">${{ total_spend|money }}</div>
+    <div class="stat-label">Total spend</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">{{ icon('file-text') }}</div>
+    <div class="stat-value">${{ total_tax|money }}</div>
+    <div class="stat-label">Total tax</div>
+  </div>
+  <div class="stat-card">
+    <div class="stat-icon">{{ icon('building') }}</div>
+    <div class="stat-value">{{ entity_count }}</div>
+    <div class="stat-label">Businesses</div>
+  </div>
+</div>
+
+<div class="dash-cols">
+  <div class="card">
+    <div class="card-head"><h2>Spend by business</h2>
+      <div class="card-head-actions"><a class="btn btn-sm" href="{{ url_for('main.entities') }}">Manage</a></div></div>
+    {% if entity_totals %}
+      {% set maxv = (entity_totals|map(attribute='total')|max) or 1 %}
+      <ul class="bar-list">
+        {% for row in entity_totals %}
+        <li>
+          <div class="bar-row">
+            <span class="bar-label"><span class="dot" style="background: {{ row.entity.color }}"></span>{{ row.entity.name }}</span>
+            <span class="bar-value">${{ row.total|money }}</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ (row.total / maxv * 100)|round(1) }}%; background: {{ row.entity.color }}"></div></div>
+        </li>
+        {% endfor %}
+        {% if unassigned > 0 %}
+        <li>
+          <div class="bar-row">
+            <span class="bar-label"><span class="dot" style="background: var(--muted)"></span>Unassigned</span>
+            <span class="bar-value">${{ unassigned|money }}</span>
+          </div>
+          <div class="bar-track"><div class="bar-fill" style="width: {{ (unassigned / maxv * 100)|round(1) }}%; background: var(--muted)"></div></div>
+        </li>
+        {% endif %}
+      </ul>
+    {% else %}
+      <p class="muted empty">No businesses yet. <a href="{{ url_for('main.entities') }}">Add one</a> to start splitting costs.</p>
+    {% endif %}
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Recent receipts</h2>
+      <div class="card-head-actions"><a class="btn btn-sm" href="{{ url_for('main.receipts') }}">View all</a></div></div>
+    {% if recent %}
+    <ul class="list">
+      {% for r in recent %}
+      <li><a href="{{ url_for('main.receipt_detail', rid=r.id) }}">
+        <span class="list-main">
+          <span class="list-title">{{ r.vendor_name or '(no vendor)' }}</span>
+          <span class="list-sub muted">{{ r.purchased_at|dt if r.purchased_at else 'No date' }}{% if r.city %} · {{ r.city }}{% if r.state %}, {{ r.state }}{% endif %}{% endif %}</span>
+        </span>
+        <span class="list-amount">${{ (r.grand_total or 0)|money }}</span>
+      </a></li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      <p class="muted empty">No receipts yet.{% if can_edit %} <a href="{{ url_for('main.receipt_new') }}">Add your first</a>.{% endif %}</p>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

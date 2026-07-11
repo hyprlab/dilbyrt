@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+data/
+.env
+*.db
+*.sqlite
+.DS_Store
+
+# Source assets / scratch (already processed into app/static)
+temp/

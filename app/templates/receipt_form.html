@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block title %}{{ 'Edit' if receipt else 'New' }} receipt · {{ site.site_name }}{% endblock %}
+{% block heading %}{{ 'Edit receipt' if receipt else 'New receipt' }}{% endblock %}
+{% block top_actions %}<a class="btn" href="{{ url_for('main.receipts') }}">{{ icon('arrow-left') }}<span>Back</span></a>{% endblock %}
+{% block content %}
+
+{% if not receipt %}
+<div class="card scan-card">
+  <div class="card-head"><h2>{{ icon('camera') }} Scan a receipt</h2></div>
+  {% if ocr_available %}
+  <p class="muted">Take a photo (or pick one) and Dilbyrt will read it and fill in the fields below. You can fix anything it gets wrong.</p>
+  <form method="post" action="{{ url_for('main.receipt_scan') }}" data-scan-url="{{ url_for('main.receipt_scan_ajax') }}" enctype="multipart/form-data" class="scan-form" id="scan-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label class="scan-drop" id="scan-drop">
+      <input type="file" name="image" accept="image/*" id="scan-input" hidden>
+      <span class="scan-drop-inner">{{ icon('upload') }}<span class="scan-drop-text">Tap to take a photo or choose an image</span></span>
+    </label>
+    <figure class="scan-preview" id="scan-preview" hidden>
+      <div class="scan-preview-imgwrap">
+        <img id="scan-preview-img" alt="Receipt preview">
+        <button type="button" class="scan-preview-remove" id="scan-remove" aria-label="Remove photo and retake">{{ icon('x') }}</button>
+      </div>
+      <figcaption class="muted">Preview — remove to retake, or scan &amp; auto-fill below.</figcaption>
+    </figure>
+    <p class="scan-status" id="scan-status" hidden></p>
+    <button class="btn btn-primary" type="submit" id="scan-submit">{{ icon('wand') }}<span>Scan &amp; auto-fill</span></button>
+  </form>
+  <div class="scan-loading" id="scan-loading" hidden>
+    <div class="spinner" role="status" aria-label="Scanning"></div>
+    <p>Reading your receipt…<br><span class="muted">This can take a few seconds.</span></p>
+  </div>
+  {% else %}
+  <p class="muted"><strong>OCR isn't available on this server</strong> (Tesseract not installed). You can still attach a receipt image below and enter the fields by hand.</p>
+  {% endif %}
+</div>
+{% endif %}
+
+{% set sm = receipt.split_mode if receipt else 'single' %}
+<form method="post" class="form receipt-form" enctype="multipart/form-data" data-split-mode="{{ sm }}"
+      action="{{ url_for('main.receipt_edit', rid=receipt.id) if receipt else url_for('main.receipt_new', img=stored_image) }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <input type="hidden" name="stored_image" value="{{ stored_image or '' }}">
+  <input type="hidden" name="ocr_text" value="{{ ocr_text or '' }}">
+
+  <div class="form-cols">
+    <div class="card">
+      <div class="card-head"><h2>Receipt details</h2></div>
+      <label>
+        <span>Vendor name</span>
+        <input name="vendor_name" type="text" value="{{ prefill.vendor_name or '' }}" placeholder="e.g. Home Depot">
+      </label>
+      <div class="row">
+        <label>
+          <span>Date &amp; time</span>
+          <input name="purchased_at" type="datetime-local" value="{{ prefill.purchased_at or '' }}">
+        </label>
+        <label>
+          <span>Currency</span>
+          <input name="currency" type="text" value="{{ receipt.currency if receipt else 'USD' }}" maxlength="8">
+        </label>
+      </div>
+      <div class="row">
+        <label>
+          <span>City</span>
+          <input name="city" type="text" value="{{ prefill.city or '' }}">
+        </label>
+        <label>
+          <span>State</span>
+          <input name="state" type="text" value="{{ prefill.state or '' }}" maxlength="64">
+        </label>
+      </div>
+      <label>
+        <span>Notes</span>
+        <textarea name="notes" rows="2" placeholder="Anything worth remembering…">{{ receipt.notes if receipt else '' }}</textarea>
+      </label>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><h2>Totals</h2></div>
+      <div class="row">
+        <label>
+          <span>Subtotal</span>
+          <input name="subtotal" type="text" inputmode="decimal" data-total="subtotal" value="{{ prefill.subtotal if prefill.subtotal not in (None, '') else '' }}" placeholder="0.00">
+        </label>
+        <label>
+          <span>Tax</span>
+          <input name="tax" type="text" inputmode="decimal" data-total="tax" value="{{ prefill.tax if prefill.tax not in (None, '') else '' }}" placeholder="0.00">
+        </label>
+      </div>
+      <label>
+        <span>Grand total <span class="req">*</span></span>
+        <input name="grand_total" type="text" inputmode="decimal" data-total="grand" value="{{ prefill.grand_total if prefill.grand_total not in (None, '') else '' }}" placeholder="0.00" required>
+      </label>
+      <p class="muted hint" data-sum-hint hidden></p>
+
+      {% if stored_image %}
+      <div class="receipt-thumb">
+        <span class="muted">Attached image</span>
+        <a href="{{ url_for('main.upload', filename=stored_image) }}" target="_blank" rel="noopener">
+          <img src="{{ url_for('main.upload', filename=stored_image) }}" alt="Receipt image">
+        </a>
+      </div>
+      {% elif receipt %}
+      <label>
+        <span>Attach an image</span>
+        <input type="file" name="image" accept="image/*">
+      </label>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('split') }} How is this split?</h2></div>
+    <div class="split-options">
+      <label class="split-opt">
+        <input type="radio" name="split_mode" value="single" {{ 'checked' if sm == 'single' }} data-split-radio>
+        <span class="split-opt-body"><span class="split-opt-title">One business</span><span class="split-opt-desc muted">The whole receipt goes to a single business.</span></span>
+      </label>
+      <label class="split-opt">
+        <input type="radio" name="split_mode" value="even" {{ 'checked' if sm == 'even' }} data-split-radio>
+        <span class="split-opt-body"><span class="split-opt-title">Split evenly (50/50…)</span><span class="split-opt-desc muted">Divide the total equally between the businesses you pick.</span></span>
+      </label>
+      <label class="split-opt">
+        <input type="radio" name="split_mode" value="itemized" {{ 'checked' if sm == 'itemized' }} data-split-radio>
+        <span class="split-opt-body"><span class="split-opt-title">Itemized</span><span class="split-opt-desc muted">Bill each line item to its own business, set in the list below.</span></span>
+      </label>
+    </div>
+
+    <div class="split-panel" data-split-panel="single" {{ '' if sm == 'single' else 'hidden' }}>
+      <label>
+        <span>Business</span>
+        <select name="entity_id">
+          <option value="">— Unassigned —</option>
+          {% for e in entities %}<option value="{{ e.id }}" {{ 'selected' if receipt and receipt.entity_id == e.id }}>{{ e.name }}</option>{% endfor %}
+        </select>
+      </label>
+    </div>
+
+    <div class="split-panel" data-split-panel="even" {{ '' if sm == 'even' else 'hidden' }}>
+      {% set chosen = receipt.split_ids() if receipt else [] %}
+      {% if entities %}
+      <p class="muted">Select the businesses to split between:</p>
+      <div class="check-grid">
+        {% for e in entities %}
+        <label class="check"><input type="checkbox" name="split_entity_ids" value="{{ e.id }}" {{ 'checked' if e.id in chosen }}><span><span class="dot" style="background: {{ e.color }}"></span>{{ e.name }}</span></label>
+        {% endfor %}
+      </div>
+      {% else %}<p class="muted">Add some businesses first.</p>{% endif %}
+    </div>
+
+    <div class="split-panel" data-split-panel="itemized" {{ '' if sm == 'itemized' else 'hidden' }}>
+      <p class="muted">Set the <strong>Bill to</strong> business for each line item below.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2>Line items</h2>
+      <div class="card-head-actions"><button type="button" class="btn btn-sm" id="add-item">{{ icon('plus') }}<span>Add item</span></button></div>
+    </div>
+    <p class="muted hint">Add each item and its cost. In <strong>Itemized</strong> split mode you can bill each item to a different business.</p>
+    <div class="table-wrap">
+    <table class="tbl items-table" id="items-table">
+      <thead>
+        <tr><th>Description</th><th class="num qty-col">Qty</th><th class="num">Unit cost</th><th class="num">Line total</th><th class="item-entity-col">Bill to</th><th></th></tr>
+      </thead>
+      <tbody id="items-body">
+        {% set items = prefill['items'] if prefill and prefill.get('items') else [] %}
+        {% for it in items %}
+        <tr class="item-row">
+          <td><input name="item_desc" type="text" value="{{ it.description }}"></td>
+          <td class="qty-col"><input name="item_qty" type="text" inputmode="decimal" class="num" value="{{ it.qty or 1 }}" data-item-qty></td>
+          <td><input name="item_cost" type="text" inputmode="decimal" class="num" value="{{ it.cost if it.cost not in (None, '') else '' }}" data-item-cost></td>
+          <td class="num line-total" data-line-total>—</td>
+          <td class="item-entity-col">
+            <select name="item_entity">
+              <option value="">—</option>
+              {% for e in entities %}<option value="{{ e.id }}" {{ 'selected' if it.entity_id == e.id }}>{{ e.name }}</option>{% endfor %}
+            </select>
+          </td>
+          <td><button type="button" class="icon-btn danger-ghost" data-remove-item aria-label="Remove">{{ icon('x') }}</button></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    <p class="items-foot muted">Items subtotal: <strong data-items-sum>$0.00</strong> <button type="button" class="link-btn" id="apply-items-subtotal">Use as subtotal</button></p>
+  </div>
+
+  <div class="form-actions sticky-actions">
+    {% if receipt %}<a class="btn btn-danger" href="#" data-open-modal="delete-modal">{{ icon('trash') }}<span>Delete</span></a>{% endif %}
+    <a class="btn" href="{{ url_for('main.receipts') }}">Cancel</a>
+    <button class="btn btn-primary" type="submit">{{ icon('check') }}<span>Save receipt</span></button>
+  </div>
+</form>
+
+{% if receipt %}
+<div class="modal" id="delete-modal" aria-hidden="true">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true">
+    <div class="modal-head"><h2>Delete receipt?</h2><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
+    <div class="modal-body"><p>This permanently removes the receipt{{ ' and its image' if receipt.image_filename else '' }}. This can't be undone.</p></div>
+    <div class="modal-foot">
+      <button class="btn" data-close type="button">Cancel</button>
+      <form method="post" action="{{ url_for('main.receipt_delete', rid=receipt.id) }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-danger" type="submit">{{ icon('trash') }}<span>Delete</span></button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<template id="item-row-template">
+  <tr class="item-row">
+    <td><input name="item_desc" type="text"></td>
+    <td class="qty-col"><input name="item_qty" type="text" inputmode="decimal" class="num" value="1" data-item-qty></td>
+    <td><input name="item_cost" type="text" inputmode="decimal" class="num" data-item-cost></td>
+    <td class="num line-total" data-line-total>—</td>
+    <td class="item-entity-col">
+      <select name="item_entity">
+        <option value="">—</option>
+        {% for e in entities %}<option value="{{ e.id }}">{{ e.name }}</option>{% endfor %}
+      </select>
+    </td>
+    <td><button type="button" class="icon-btn danger-ghost" data-remove-item aria-label="Remove">{{ icon('x') }}</button></td>
+  </tr>
+</template>
+{% endblock %}

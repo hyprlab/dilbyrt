@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="csrf-token" content="{{ csrf_token() }}">
+  <title>{% block title %}{{ (site.site_name if site else 'Dilbyrt') }}{% endblock %}</title>
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.ico', v=app_build_id) }}" sizes="any">
+  <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='img/favicon-32.png', v=app_build_id) }}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='img/favicon-16.png', v=app_build_id) }}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='img/apple-touch-icon.png', v=app_build_id) }}">
+  <meta name="theme-color" content="#faa51d">
+  <script>
+    // Anti-FOUC: apply the saved theme before first paint.
+    (function(){ try {
+      var t = localStorage.getItem('dilbyrt-theme');
+      if (t) document.documentElement.setAttribute('data-theme', t);
+      else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.setAttribute('data-theme', 'dark');
+    } catch(e){} })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css', v=app_build_id) }}">
+</head>
+<body>
+{% if current_user.is_authenticated %}
+<div class="layout">
+  <aside class="sidebar" id="sidebar">
+    <a class="brand" href="{{ url_for('main.index') }}">
+      <img class="brand-logo" src="{{ url_for('static', filename='img/logo_dilbyrt.png', v=app_build_id) }}" alt="Dilbyrt">
+      <span>
+        <span class="brand-title">{{ (site.site_name if site else 'Dilbyrt') }}</span>
+        <span class="brand-sub">Receipts</span>
+      </span>
+    </a>
+
+    <nav>
+      {% set ep = request.endpoint or '' %}
+      <a href="{{ url_for('main.index') }}" class="{{ 'active' if ep == 'main.index' }}">{{ icon('dashboard') }}<span>Dashboard</span></a>
+      <a href="{{ url_for('main.receipts') }}" class="{{ 'active' if ep.startswith('main.receipt') }}">{{ icon('receipt') }}<span>Receipts</span></a>
+      <a href="{{ url_for('main.entities') }}" class="{{ 'active' if ep.startswith('main.entit') }}">{{ icon('building') }}<span>Businesses</span></a>
+      <a href="{{ url_for('main.help_page') }}" class="{{ 'active' if ep == 'main.help_page' }}">{{ icon('help-circle') }}<span>Help</span></a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="user-chip">
+        <span class="user-avatar">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
+        <span class="user-meta">
+          <span class="user-name">{{ current_user.name or current_user.username }}</span>
+          <span class="user-role">{{ current_user.role }}</span>
+        </span>
+      </div>
+      <div class="footer-actions">
+        {% if is_admin %}
+        <button type="button" class="icon-btn" data-open-modal="settings-modal" title="Settings" aria-label="Settings">{{ icon('settings') }}</button>
+        {% endif %}
+        <button type="button" class="icon-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
+          <span class="theme-icon-light">{{ icon('sun') }}</span><span class="theme-icon-dark">{{ icon('moon') }}</span>
+        </button>
+        <a class="icon-btn" href="{{ url_for('auth.logout') }}" title="Sign out" aria-label="Sign out">{{ icon('log-out') }}</a>
+      </div>
+    </div>
+  </aside>
+  <div class="sidebar-scrim" id="sidebar-scrim"></div>
+
+  <main class="content">
+    <header class="topbar">
+      <button type="button" class="menu-btn" id="menu-toggle" aria-label="Toggle menu">{{ icon('menu') }}</button>
+      <h1>{% block heading %}{% endblock %}</h1>
+      <div class="top-actions">
+        <button type="button" class="icon-btn topbar-search" data-open-search title="Search (⌘K)" aria-label="Search">{{ icon('search') }}</button>
+        {% block top_actions %}{% endblock %}
+      </div>
+    </header>
+
+    <div class="flashes">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}
+        <div class="flash flash-{{ 'danger' if cat == 'error' else cat }}">{{ msg }}</div>
+      {% endfor %}
+    {% endwith %}
+    </div>
+
+    <section class="page">{% block content %}{% endblock %}</section>
+  </main>
+</div>
+
+<div class="modal search-modal" id="search-modal" aria-hidden="true">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-labelledby="search-input">
+    <div class="search-modal-head">
+      <span class="search-modal-icon">{{ icon('search') }}</span>
+      <input type="search" id="search-input" autocomplete="off" spellcheck="false"
+             placeholder="Search vendors, businesses, notes…" aria-label="Search">
+      <kbd class="search-modal-esc">Esc</kbd>
+    </div>
+    <div class="search-modal-body" id="search-modal-body">
+      <p class="muted search-modal-hint">Start typing to search your receipts…</p>
+    </div>
+    <div class="search-modal-foot" id="search-modal-foot" hidden>
+      <a class="btn btn-primary" id="search-modal-all" href="#">{{ icon('search') }}<span>See all results</span></a>
+    </div>
+  </div>
+</div>
+{% if is_admin %}{% include "_settings_modal.html" %}{% endif %}
+<script>window.DILBYRT_SEARCH_URL = "{{ url_for('main.api_search') }}"; window.DILBYRT_SEARCH_PAGE = "{{ url_for('main.search_page') }}";</script>
+<script src="{{ url_for('static', filename='js/app.js', v=app_build_id) }}"></script>
+{% else %}
+{% block auth_content %}{% endblock %}
+<script src="{{ url_for('static', filename='js/app.js', v=app_build_id) }}"></script>
+{% endif %}
+</body>
+</html>

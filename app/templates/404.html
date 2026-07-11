@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Not found · {{ (site.site_name if site else 'Dilbyrt') }}{% endblock %}
+{% block heading %}Not found{% endblock %}
+{% block content %}
+<div class="card empty-state">
+  {{ icon('alert-triangle') }}
+  <p>That page doesn't exist.</p>
+  <a class="btn btn-primary" href="{{ url_for('main.index') }}">{{ icon('dashboard') }}<span>Back to dashboard</span></a>
+</div>
+{% endblock %}
+{% block auth_content %}
+<div class="login-split"><section class="login-form-pane"><div class="login-form">
+  <h2 class="login-heading">Not found</h2>
+  <p class="muted">That page doesn't exist.</p>
+  <a class="btn btn-primary" href="{{ url_for('auth.login') }}">Go to sign in</a>
+</div></section></div>
+{% endblock %}

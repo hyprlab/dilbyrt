@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}{{ r.vendor_name or 'Receipt' }} · {{ site.site_name }}{% endblock %}
+{% block heading %}{{ r.vendor_name or 'Receipt' }}{% endblock %}
+{% block top_actions %}
+  <a class="btn" href="{{ url_for('main.receipts') }}">{{ icon('arrow-left') }}<span>Back</span></a>
+  {% if can_edit %}<a class="btn btn-primary" href="{{ url_for('main.receipt_edit', rid=r.id) }}">{{ icon('edit') }}<span>Edit</span></a>{% endif %}
+{% endblock %}
+{% block content %}
+<div class="detail-cols">
+  <div class="detail-main">
+    <div class="card">
+      <div class="receipt-summary">
+        <div>
+          <div class="summary-vendor">{{ r.vendor_name or '(no vendor)' }}</div>
+          <div class="muted">
+            {{ r.purchased_at|dt('%A, %b %d, %Y · %I:%M %p') if r.purchased_at else 'No date recorded' }}
+            {% if r.city or r.state %}<br>{{ icon('map-pin') }} {{ r.city }}{% if r.state %}, {{ r.state }}{% endif %}{% endif %}
+          </div>
+        </div>
+        <div class="summary-total">
+          <span class="muted">Grand total</span>
+          <span class="summary-amount">${{ (r.grand_total or 0)|money }}</span>
+        </div>
+      </div>
+
+      <div class="totals-strip">
+        <div><span class="muted">Subtotal</span><strong>${{ (r.subtotal or 0)|money }}</strong></div>
+        <div><span class="muted">Tax</span><strong>${{ (r.tax or 0)|money }}</strong></div>
+        <div><span class="muted">Total</span><strong>${{ (r.grand_total or 0)|money }}</strong></div>
+      </div>
+
+      {% if r.notes %}<p class="detail-notes">{{ r.notes }}</p>{% endif %}
+    </div>
+
+    {% if r.items %}
+    <div class="card">
+      <div class="card-head"><h2>Line items</h2></div>
+      <div class="table-wrap">
+      <table class="tbl">
+        <thead><tr><th>Description</th><th class="num">Qty</th><th class="num">Unit</th><th class="num">Total</th><th>Bill to</th></tr></thead>
+        <tbody>
+          {% for it in r.items %}
+          <tr>
+            <td class="strong">{{ it.description or '—' }}</td>
+            <td class="num">{{ it.qty|round(2) if it.qty else 1 }}</td>
+            <td class="num">${{ (it.cost or 0)|money }}</td>
+            <td class="num strong">${{ it.line_total()|money }}</td>
+            <td>{% if it.entity %}<span class="chip" style="--chip: {{ it.entity.color }}">{{ it.entity.name }}</span>{% else %}<span class="muted">—</span>{% endif %}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {% if r.image_filename %}
+    <div class="card">
+      <div class="card-head"><h2>{{ icon('image') }} Receipt image</h2></div>
+      <a href="{{ url_for('main.upload', filename=r.image_filename) }}" target="_blank" rel="noopener">
+        <img class="receipt-full" src="{{ url_for('main.upload', filename=r.image_filename) }}" alt="Receipt image">
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <aside class="detail-side">
+    <div class="card">
+      <div class="card-head"><h2>Cost split</h2></div>
+      <div class="split-badge">
+        {% if r.split_mode == 'single' %}{{ icon('building') }} One business
+        {% elif r.split_mode == 'even' %}{{ icon('split') }} Split evenly
+        {% else %}{{ icon('split') }} Itemized{% endif %}
+      </div>
+      {% if allocations %}
+      <ul class="alloc-list">
+        {% for eid, amt in allocations.items() %}
+        {% set e = entities.get(eid) %}
+        <li>
+          <span class="alloc-name"><span class="dot" style="background: {{ e.color if e else 'var(--muted)' }}"></span>{{ e.name if e else 'Unknown' }}</span>
+          <span class="alloc-amt strong">${{ amt|money }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p class="muted">This receipt isn't assigned to any business yet.{% if can_edit %} <a href="{{ url_for('main.receipt_edit', rid=r.id) }}">Assign it</a>.{% endif %}</p>
+      {% endif %}
+    </div>
+
+    <div class="card meta-card">
+      <div class="card-head"><h2>Details</h2></div>
+      <dl class="meta-list">
+        <dt>Currency</dt><dd>{{ r.currency }}</dd>
+        <dt>Added by</dt><dd>{{ r.creator.name or r.creator.username if r.creator else '—' }}</dd>
+        <dt>Added</dt><dd>{{ r.created_at|dt('%b %d, %Y') }}</dd>
+      </dl>
+    </div>
+  </aside>
+</div>
+{% endblock %}

@@ -1,0 +1,140 @@
+{# Admin-only tabbed Settings popup, opened from the sidebar footer gear. #}
+<div class="modal modal-lg" id="settings-modal" aria-hidden="true">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Settings">
+    <div class="modal-head">
+      <h2>{{ icon('settings') }} Settings</h2>
+      <button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button>
+    </div>
+    <div class="modal-tabs" role="tablist">
+      <button type="button" class="modal-tab active" data-tab="general" role="tab">General</button>
+      <button type="button" class="modal-tab" data-tab="login" role="tab">{{ icon('image') }} Login</button>
+      <button type="button" class="modal-tab" data-tab="users" role="tab">{{ icon('users') }} Users</button>
+    </div>
+    <div class="modal-body">
+
+      {# ── General ─────────────────────────────────────────────────── #}
+      <div class="tab-panel" data-tab-panel="general">
+        <form method="post" action="{{ url_for('main.settings') }}" class="form">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <section class="settings-section">
+            <h3>{{ icon('help-circle') }} Cloudflare Turnstile</h3>
+            <p class="muted hint">Adds a bot-check to the login screen. Get free keys from your Cloudflare dashboard → Turnstile. Both keys are required before it can be enabled.</p>
+            <label class="check switch-row"><input type="checkbox" name="turnstile_enabled" value="1" {{ 'checked' if site.turnstile_enabled }}><span>Enable Turnstile on the login screen</span></label>
+            <label><span>Site key <span class="muted">(public)</span></span><input name="turnstile_site_key" type="text" value="{{ site.turnstile_site_key or '' }}" placeholder="0x4AAAAAAA…"></label>
+            <label><span>Secret key <span class="muted">(stored encrypted)</span></span><input name="turnstile_secret_key" type="password" placeholder="{{ '•••••••• (set — leave blank to keep)' if has_turnstile_secret else 'Enter secret key' }}"></label>
+            {% if has_turnstile_secret %}<label class="check"><input type="checkbox" name="clear_turnstile_secret" value="1"><span>Clear the stored secret key</span></label>{% endif %}
+          </section>
+
+          <section class="settings-section">
+            <h3>{{ icon('sheet') }} Google Sheets sync</h3>
+            {% if sheets_key_present %}
+            <p class="muted hint"><span class="chip chip-ok">Connected</span> A service-account key is mounted. Paste the target sheet's ID, share it (Editor) with the service account, then use <em>Export → Push to Google Sheet</em>.</p>
+            {% else %}
+            <p class="muted hint">Optional. CSV/Excel export already opens cleanly in Google Sheets. For live sync, mount a Google service-account key (see the README). This field is saved either way.</p>
+            {% endif %}
+            <label><span>Google Sheet ID</span><input name="google_sheet_id" type="text" value="{{ site.google_sheet_id or '' }}" placeholder="1AbC…the long id from the sheet URL"></label>
+          </section>
+
+          <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon('check') }}<span>Save settings</span></button></div>
+        </form>
+      </div>
+
+      {# ── Login screen ────────────────────────────────────────────── #}
+      <div class="tab-panel" data-tab-panel="login" hidden>
+        <section class="settings-section" style="border-bottom:0;">
+          <h3>{{ icon('image') }} Login background</h3>
+          <p class="muted hint">Upload images for the left side of the login screen. One is picked <strong>at random every time</strong> the login page loads. With none uploaded, the default gradient is shown. Phone photos are auto-rotated and resized.</p>
+
+          {% if login_bg_files %}
+          <div class="login-bg-grid">
+            {% for name in login_bg_files %}
+            <div class="login-bg-item">
+              <img src="{{ url_for('main.login_bg', filename=name) }}" alt="" loading="lazy">
+              <form method="post" action="{{ url_for('main.login_bg_delete') }}" class="login-bg-del">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <input type="hidden" name="filename" value="{{ name }}">
+                <button type="submit" class="login-bg-del-btn" aria-label="Remove image"
+                  onclick="return confirm('Remove this login background?')">{{ icon('trash') }}</button>
+              </form>
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <p class="muted empty">No images yet — the default gradient is in use.</p>
+          {% endif %}
+
+          <form method="post" action="{{ url_for('main.login_bg_upload') }}" enctype="multipart/form-data" class="login-bg-upload" id="login-bg-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <label class="login-bg-drop">
+              <input type="file" name="images" accept="image/png,image/jpeg,image/webp,image/gif" multiple hidden id="login-bg-input">
+              <span id="login-bg-label">{{ icon('upload') }} <span>Choose image(s)…</span></span>
+            </label>
+            <button class="btn btn-primary btn-sm" type="submit">{{ icon('plus') }}<span>Upload</span></button>
+          </form>
+        </section>
+      </div>
+
+      {# ── Users ───────────────────────────────────────────────────── #}
+      <div class="tab-panel" data-tab-panel="users" hidden>
+        <details class="user-add">
+          <summary class="btn btn-primary">{{ icon('plus') }}<span>Add user</span></summary>
+          <form method="post" action="{{ url_for('main.user_new') }}" class="form user-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="row">
+              <label><span>Username <span class="req">*</span></span><input name="username" type="text" required></label>
+              <label><span>Display name</span><input name="name" type="text"></label>
+            </div>
+            <label><span>Email <span class="req">*</span></span><input name="email" type="email" required></label>
+            <div class="row">
+              <label><span>Password <span class="req">*</span></span><input name="password" type="password" required></label>
+              <label><span>Role</span><select name="role">{% for k, label in settings_roles %}<option value="{{ k }}" {{ 'selected' if k == 'viewer' }}>{{ label }}</option>{% endfor %}</select></label>
+            </div>
+            <div class="form-actions"><button class="btn btn-primary btn-sm" type="submit">Create user</button></div>
+          </form>
+        </details>
+
+        <div class="user-list">
+          {% for u in settings_users %}
+          <details class="user-item">
+            <summary>
+              <span class="user-avatar sm">{{ (u.name or u.username)[:1]|upper }}</span>
+              <span class="user-item-main">
+                <span class="user-item-name">{{ u.name or u.username }}{% if u.id == current_user.id %} <span class="muted">(you)</span>{% endif %}</span>
+                <span class="user-item-sub muted">{{ u.email }}</span>
+              </span>
+              <span class="chip chip-role chip-role-{{ u.role }}">{{ u.role }}</span>
+              {% if u.disabled %}<span class="chip chip-muted">Disabled</span>{% endif %}
+              <span class="user-item-caret">{{ icon('chevron-right') }}</span>
+            </summary>
+            <form method="post" action="{{ url_for('main.user_edit', uid=u.id) }}" class="form user-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="row">
+                <label><span>Display name</span><input name="name" type="text" value="{{ u.name or '' }}"></label>
+                <label><span>Email</span><input name="email" type="email" value="{{ u.email }}"></label>
+              </div>
+              <div class="row">
+                <label><span>Role</span><select name="role">{% for k, label in settings_roles %}<option value="{{ k }}" {{ 'selected' if k == u.role }}>{{ label }}</option>{% endfor %}</select></label>
+                <label><span>New password</span><input name="password" type="password" placeholder="Leave blank to keep"></label>
+              </div>
+              {% if u.id != current_user.id %}
+              <label class="check"><input type="checkbox" name="disabled" value="1" {{ 'checked' if u.disabled }}><span>Disable this account</span></label>
+              {% endif %}
+              <div class="form-actions">
+                {% if u.id != current_user.id %}
+                <button class="btn btn-danger btn-sm" type="submit" formaction="{{ url_for('main.user_delete', uid=u.id) }}"
+                  onclick="return confirm('Delete {{ u.username|e }}?')">{{ icon('trash') }}<span>Delete</span></button>
+                {% endif %}
+                <span class="spacer"></span>
+                <button class="btn btn-primary btn-sm" type="submit">Save</button>
+              </div>
+            </form>
+          </details>
+          {% endfor %}
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>

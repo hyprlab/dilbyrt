@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Sign in · {{ (site.site_name if site else 'Dilbyrt') }}{% endblock %}
+{% block auth_content %}
+{% set login_bg = random_login_bg() %}
+<div class="login-split">
+  <aside class="login-hero{% if login_bg %} has-image{% endif %}"{% if login_bg %} style="background-image: url('{{ login_bg }}');"{% endif %}>
+    {% if not login_bg %}<canvas class="login-hero-bg" aria-hidden="true"></canvas>{% endif %}
+    <div class="login-hero-inner">
+      <img class="login-hero-logo" src="{{ url_for('static', filename='img/logo_dilbyrt.png', v=app_build_id) }}" alt="Dilbyrt">
+      <div class="login-hero-title">{{ (site.site_name if site else 'Dilbyrt') }}</div>
+      <div class="login-hero-tag">Receipt Management System</div>
+    </div>
+  </aside>
+
+  <section class="login-form-pane">
+    <form method="post" class="login-form" id="login-form" autocomplete="on">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <h2 class="login-heading">Welcome back</h2>
+      <p class="login-sub muted">Sign in to manage your receipts.</p>
+
+      <div class="flashes login-flashes">
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for cat, msg in messages %}<div class="flash flash-{{ 'danger' if cat == 'error' else cat }}">{{ msg }}</div>{% endfor %}
+      {% endwith %}
+      </div>
+
+      <label>
+        <span>Username <span class="req">*</span></span>
+        <input name="username" type="text" autocomplete="username" autofocus required>
+      </label>
+      <label>
+        <span>Password <span class="req">*</span></span>
+        <input name="password" type="password" autocomplete="current-password" required>
+      </label>
+      <label class="check login-remember">
+        <input type="checkbox" name="remember" value="1">
+        <span>Remember me on this device</span>
+      </label>
+
+      {% if site and site.turnstile_enabled and site.turnstile_site_key %}
+      <div class="cf-turnstile login-turnstile"
+           data-sitekey="{{ site.turnstile_site_key }}"
+           data-theme="auto" data-size="flexible"></div>
+      {% endif %}
+
+      <button class="btn btn-primary login-submit" type="submit">Log In</button>
+    </form>
+    {% if site and site.turnstile_enabled and site.turnstile_site_key %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    {% endif %}
+    <div class="login-form-footer muted">Dilbyrt · v{{ app_version }}</div>
+  </section>
+</div>
+{% endblock %}

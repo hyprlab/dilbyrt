@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Businesses · {{ site.site_name }}{% endblock %}
+{% block heading %}Businesses{% endblock %}
+{% block top_actions %}{% if can_edit %}<button class="btn btn-primary" data-open-modal="new-entity-modal">{{ icon('plus') }}<span>Add business</span></button>{% endif %}{% endblock %}
+{% block content %}
+<div class="card">
+  <p class="muted hint">These are the businesses you assign receipts and line items to. Totals below reflect every receipt's allocation.</p>
+  {% if entities %}
+  <div class="table-wrap">
+  <table class="tbl">
+    <thead><tr><th>Business</th><th>Status</th><th class="num">Allocated total</th>{% if can_edit %}<th></th>{% endif %}</tr></thead>
+    <tbody>
+      {% for e in entities %}
+      <tr>
+        <td class="strong"><span class="dot" style="background: {{ e.color }}"></span>{{ e.name }}</td>
+        <td>{% if e.active %}<span class="chip chip-ok">Active</span>{% else %}<span class="chip chip-muted">Inactive</span>{% endif %}</td>
+        <td class="num strong">${{ (totals.get(e.id, 0))|money }}</td>
+        {% if can_edit %}
+        <td class="row-actions">
+          <button class="icon-btn" aria-label="Edit"
+            data-open-modal="edit-entity-{{ e.id }}">{{ icon('edit') }}</button>
+        </td>
+        {% endif %}
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <div class="empty-state">{{ icon('building') }}<p>No businesses yet.</p>{% if can_edit %}<button class="btn btn-primary" data-open-modal="new-entity-modal">{{ icon('plus') }}<span>Add your first business</span></button>{% endif %}</div>
+  {% endif %}
+</div>
+
+{% if can_edit %}
+<div class="modal" id="new-entity-modal" aria-hidden="true">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true">
+    <div class="modal-head"><h2>Add business</h2><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
+    <form method="post" action="{{ url_for('main.entity_new') }}" class="form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <label><span>Business name <span class="req">*</span></span><input name="name" type="text" required autofocus></label>
+        <label><span>Chip colour</span><input name="color" type="color" value="#0b5cff" class="color-input"></label>
+      </div>
+      <div class="modal-foot"><button class="btn" data-close type="button">Cancel</button><button class="btn btn-primary" type="submit">Add</button></div>
+    </form>
+  </div>
+</div>
+
+{% for e in entities %}
+<div class="modal" id="edit-entity-{{ e.id }}" aria-hidden="true">
+  <div class="modal-backdrop" data-close></div>
+  <div class="modal-panel" role="dialog" aria-modal="true">
+    <div class="modal-head"><h2>Edit business</h2><button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button></div>
+    <form method="post" action="{{ url_for('main.entity_edit', eid=e.id) }}" class="form">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <label><span>Business name</span><input name="name" type="text" value="{{ e.name }}" required></label>
+        <label><span>Chip colour</span><input name="color" type="color" value="{{ e.color }}" class="color-input"></label>
+        <label class="check"><input type="checkbox" name="active" value="1" {{ 'checked' if e.active }}><span>Active</span></label>
+      </div>
+      <div class="modal-foot">
+        <button class="btn btn-danger btn-sm" type="submit" formaction="{{ url_for('main.entity_delete', eid=e.id) }}"
+          onclick="return confirm('Delete {{ e.name|e }}? Receipts billed to it become unassigned.')">{{ icon('trash') }}<span>Delete</span></button>
+        <span class="spacer"></span>
+        <button class="btn" data-close type="button">Cancel</button>
+        <button class="btn btn-primary" type="submit">Save</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endfor %}
+{% endif %}
+{% endblock %}

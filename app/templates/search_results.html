@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% block title %}Search · {{ site.site_name }}{% endblock %}
+{% block heading %}Search{% endblock %}
+{% block content %}
+<div class="card">
+  <form class="filter-bar" method="get" action="{{ url_for('main.search_page') }}">
+    <div class="search-inline">{{ icon('search') }}<input type="search" name="q" value="{{ q }}" placeholder="Search receipts and businesses…" autofocus></div>
+    <button class="btn btn-primary" type="submit">Search</button>
+  </form>
+
+  {% if q and total == 0 %}
+    <p class="muted empty">No results for “{{ q }}”.</p>
+  {% elif not q %}
+    <p class="muted empty">Type a query to search across your receipts and businesses.</p>
+  {% else %}
+    <p class="muted result-count">{{ total }} result{{ 's' if total != 1 }} for “{{ q }}”</p>
+    {% for s in sections %}
+    <div class="search-section">
+      <h3 class="search-section-head">{{ icon(s.icon) }} {{ s.label }}</h3>
+      <ul class="list">
+        {% for it in s['items'] %}
+        <li><a href="{{ it.url }}">
+          <span class="list-main"><span class="list-title">{{ it.label }}</span><span class="list-sub muted">{{ it.snippet }}</span></span>
+          {{ icon('chevron-right') }}
+        </a></li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  {% endif %}
+</div>
+{% endblock %}

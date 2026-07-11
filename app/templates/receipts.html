@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Receipts · {{ site.site_name }}{% endblock %}
+{% block heading %}Receipts{% endblock %}
+{% block top_actions %}
+  <div class="export-menu">
+    <button type="button" class="btn" data-menu-toggle>{{ icon('download') }}<span>Export</span></button>
+    <div class="menu-pop" hidden>
+      <a href="{{ url_for('main.export_csv') }}">{{ icon('file-text') }}CSV</a>
+      <a href="{{ url_for('main.export_xlsx') }}">{{ icon('table') }}Excel (.xlsx)</a>
+      {% if sheets_configured and can_edit %}
+      <form method="post" action="{{ url_for('main.export_sheets') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button type="submit">{{ icon('sheet') }}Push to Google Sheet</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% if can_edit %}<a class="btn btn-primary" href="{{ url_for('main.receipt_new') }}">{{ icon('plus') }}<span>New receipt</span></a>{% endif %}
+{% endblock %}
+{% block content %}
+<div class="card">
+  <form class="filter-bar" method="get" action="{{ url_for('main.receipts') }}">
+    <div class="search-inline">
+      {{ icon('search') }}
+      <input type="search" name="q" value="{{ q }}" placeholder="Filter by vendor, city, notes…" data-live-filter>
+    </div>
+    <select name="entity" onchange="this.form.submit()">
+      <option value="">All businesses</option>
+      {% for e in entities %}
+      <option value="{{ e.id }}" {{ 'selected' if active_entity == e.id }}>{{ e.name }}</option>
+      {% endfor %}
+    </select>
+    {% if q or active_entity %}<a class="btn btn-sm" href="{{ url_for('main.receipts') }}">Clear</a>{% endif %}
+  </form>
+
+  {% if receipts %}
+  <div class="table-wrap">
+  <table class="tbl" id="receipts-table">
+    <thead>
+      <tr><th>Date</th><th>Vendor</th><th>Location</th><th>Billed to</th><th class="num">Total</th><th></th></tr>
+    </thead>
+    <tbody>
+      {% for r in receipts %}
+      <tr data-row-search="{{ (r.vendor_name ~ ' ' ~ r.city ~ ' ' ~ r.state ~ ' ' ~ (r.notes or ''))|lower }}"
+          onclick="location.href='{{ url_for('main.receipt_detail', rid=r.id) }}'">
+        <td>{{ r.purchased_at|dt if r.purchased_at else '—' }}</td>
+        <td class="strong">{{ r.vendor_name or '(no vendor)' }}</td>
+        <td class="muted">{{ r.city }}{% if r.state %}, {{ r.state }}{% endif %}</td>
+        <td>
+          {% set alloc = r.entity_allocations() %}
+          {% if r.split_mode == 'even' and alloc|length > 1 %}<span class="chip chip-split">{{ icon('split') }}Split ×{{ alloc|length }}</span>
+          {% elif r.split_mode == 'itemized' %}<span class="chip chip-split">{{ icon('split') }}Itemized</span>
+          {% elif r.entity %}<span class="chip" style="--chip: {{ r.entity.color }}">{{ r.entity.name }}</span>
+          {% else %}<span class="chip chip-muted">Unassigned</span>{% endif %}
+        </td>
+        <td class="num strong">${{ (r.grand_total or 0)|money }}</td>
+        <td class="row-arrow">{{ icon('chevron-right') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  <p class="muted no-match" hidden>No receipts match your filter.</p>
+  {% else %}
+  <div class="empty-state">
+    {{ icon('receipt') }}
+    <p>No receipts yet.</p>
+    {% if can_edit %}<a class="btn btn-primary" href="{{ url_for('main.receipt_new') }}">{{ icon('plus') }}<span>Add your first receipt</span></a>{% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
