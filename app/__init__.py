@@ -201,6 +201,15 @@ def _migrate_columns(app):
     from sqlalchemy import text
     wanted = {
         "receipt": [("tax_rate", "FLOAT")],
+        "site_setting": [
+            ("google_drive_enabled", "BOOLEAN DEFAULT 0"),
+            ("google_oauth_client_id", "VARCHAR(255)"),
+            ("google_oauth_client_secret_enc", "BLOB"),
+            ("google_drive_refresh_token_enc", "BLOB"),
+            ("google_drive_account_email", "VARCHAR(255)"),
+            ("google_drive_root_id", "VARCHAR(128)"),
+        ],
+        "business_entity": [("drive_folder_id", "VARCHAR(128)")],
     }
     try:
         with db.engine.begin() as conn:

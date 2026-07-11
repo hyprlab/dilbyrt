@@ -106,6 +106,16 @@ def inject_globals():
         ctx["has_turnstile_secret"] = bool(site and site.turnstile_secret_key_enc)
         ctx["sheets_key_present"] = sheets_mod.sheets_available()
         ctx["login_bg_files"] = _login_bg_files()
+        from . import drive as drive_mod
+        ctx["drive_libs"] = drive_mod.libs_available()
+        ctx["drive_configured"] = drive_mod.is_configured(site)
+        ctx["drive_connected"] = drive_mod.is_connected(site)
+        ctx["drive_email"] = site.google_drive_account_email if site else None
+        ctx["has_drive_secret"] = bool(site and site.google_oauth_client_secret_enc)
+        try:
+            ctx["drive_redirect_uri"] = drive_mod.redirect_uri()
+        except Exception:
+            ctx["drive_redirect_uri"] = ""
     return ctx
 
 
@@ -384,7 +394,17 @@ def _save_receipt(r):
                                    entity_id=eid))
 
     db.session.commit()
-    flash("Receipt saved.", "success")
+
+    # Back up the image to Google Drive (per business-entity folders) on
+    # create. Best-effort: never let a Drive hiccup block the save.
+    extra = ""
+    if is_new:
+        from . import drive as drive_mod
+        if drive_mod.is_active():
+            _n, dmsg = drive_mod.upload_receipt(r)
+            if dmsg:
+                extra = " " + dmsg
+    flash("Receipt saved." + extra, "success")
     return redirect(url_for("main.receipt_detail", rid=r.id))
 
 
@@ -658,8 +678,7 @@ def settings():
     site = _site()
     if request.method == "POST":
         # Site name is fixed to "Dilbyrt" — not user-configurable.
-        site.google_sheet_id = _f("google_sheet_id") or None
-
+        # Google Sheets/Drive config lives on the Google tab (see google_save).
         site.turnstile_site_key = _f("turnstile_site_key") or None
         secret = request.form.get("turnstile_secret_key") or ""
         if secret.strip():
@@ -683,6 +702,74 @@ def settings():
     # Settings is a popup now — a direct GET just opens the dashboard with the
     # modal reopened on the General tab.
     return redirect(url_for("main.index", settings="general"))
+
+
+# ── Google integrations (Sheets id + Drive OAuth) ─────────────────────────
+@bp.route("/settings/google", methods=["POST"])
+@role_required("admin")
+def google_save():
+    from .crypto import encrypt
+    from . import drive as drive_mod
+    site = _site()
+    site.google_sheet_id = _f("google_sheet_id") or None
+    site.google_oauth_client_id = _f("google_oauth_client_id") or None
+    secret = request.form.get("google_oauth_client_secret") or ""
+    if secret.strip():
+        site.google_oauth_client_secret_enc = encrypt(secret.strip())
+    elif request.form.get("clear_google_secret") == "1":
+        site.google_oauth_client_secret_enc = None
+    want = request.form.get("google_drive_enabled") == "1"
+    if want and not drive_mod.is_connected(site):
+        flash("Connect a Google account below before enabling Drive backup.", "warning")
+        site.google_drive_enabled = False
+    else:
+        site.google_drive_enabled = want
+    db.session.commit()
+    flash("Google settings saved.", "success")
+    return redirect(url_for("main.index", settings="google"))
+
+
+@bp.route("/settings/google/connect")
+@role_required("admin")
+def google_connect():
+    from . import drive as drive_mod
+    if not drive_mod.libs_available():
+        flash("The Google client libraries aren't installed on this server.", "danger")
+        return redirect(url_for("main.index", settings="google"))
+    if not drive_mod.is_configured():
+        flash("Enter your OAuth client ID and secret first, then Save.", "warning")
+        return redirect(url_for("main.index", settings="google"))
+    return redirect(drive_mod.authorize_url())
+
+
+@bp.route("/settings/google/callback")
+@role_required("admin")
+def google_callback():
+    from . import drive as drive_mod
+    err = request.args.get("error")
+    if err:
+        flash(f"Google connection cancelled: {err}", "warning")
+        return redirect(url_for("main.index", settings="google"))
+    code = request.args.get("code")
+    if not code:
+        return redirect(url_for("main.index", settings="google"))
+    ok, msg = drive_mod.exchange_code(code)
+    if ok:
+        # Auto-enable on a successful connect for a one-click experience.
+        site = _site()
+        site.google_drive_enabled = True
+        db.session.commit()
+    flash(msg, "success" if ok else "danger")
+    return redirect(url_for("main.index", settings="google"))
+
+
+@bp.route("/settings/google/disconnect", methods=["POST"])
+@role_required("admin")
+def google_disconnect():
+    from . import drive as drive_mod
+    drive_mod.disconnect()
+    flash("Disconnected from Google Drive.", "success")
+    return redirect(url_for("main.index", settings="google"))
 
 
 # ── login background images ──────────────────────────────────────────────

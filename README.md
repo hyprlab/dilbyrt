@@ -20,6 +20,8 @@ language, auth model, and security posture with the Trusted Servants Pro app.
 - **Live search** across vendors, locations, notes, and businesses (⌘K / Ctrl-K).
 - **Exports.** Download CSV or Excel (both open cleanly in Google Sheets), or
   push directly to a Google Sheet when a service-account key is configured.
+- **Google Drive backup.** Optionally copy each new receipt image into per-business
+  folders on your Drive (split receipts land in every business's folder).
 - **Users, roles & permissions** — viewer / editor / admin.
 - **Cloudflare Turnstile** bot-check on the login screen (optional, per-instance).
 - **Light / dark theme**, fully mobile-responsive, brute-force login lockout,
@@ -121,9 +123,41 @@ sum correctly with a pivot table or `SUMIF`.
 3. Create a Google Sheet, **Share** it (Editor) with the service account's
    email (from the JSON key), and copy the sheet **ID** (the long token in its
    URL between `/d/` and `/edit`).
-4. Paste that ID into Dilbyrt → **Settings → Google Sheets sync** and save.
+4. Paste that ID into Dilbyrt → **Settings → Google → Google Sheets sync** and save.
 5. On the Receipts page, **Export → Push to Google Sheet** now writes the data
    into a `Receipts` tab you can edit from your Chromebook.
+
+## Google Drive backup of receipt images
+
+When a new receipt is saved, Dilbyrt can copy its image into your Google Drive,
+organised by business: a top-level **`Dilbyrt`** folder containing a subfolder
+per business entity, with files named
+`YYYY-MM-DD_business-entity-name_receipt-vendor.<ext>`. Receipts split across
+multiple businesses are copied into **each** business's folder.
+
+This uses **OAuth** (you connect your own Google account) rather than a service
+account — a service account has no personal-Drive storage and its uploads fail.
+The `drive.file` scope means Dilbyrt only ever sees the folders/files it
+creates, never the rest of your Drive.
+
+One-time setup (admin):
+
+1. In the [Google Cloud console](https://console.cloud.google.com/): create/pick
+   a project → enable the **Google Drive API** → configure the **OAuth consent
+   screen** (User type *External*; add your Google account under *Test users*).
+2. **Credentials → Create credentials → OAuth client ID → Web application.**
+   Copy the **Authorized redirect URI** shown in Dilbyrt → **Settings → Google →
+   Google Drive backup → OAuth client setup** into the client's *Authorized
+   redirect URIs*. Google requires **HTTPS** for this URI (except `localhost`),
+   so Drive backup needs Dilbyrt served over HTTPS or accessed at `localhost`.
+3. Paste the **client ID** and **client secret** into that same panel and
+   **Save Google settings**.
+4. Click **Connect Google Drive** and approve. Tick **Back up new receipts to
+   Google Drive** (auto-enabled on connect).
+
+From then on, saving a new receipt uploads its image to the right folder(s). The
+backup is best-effort — if Drive is unreachable the receipt still saves and you
+get a warning. (Backup runs on receipt *creation*; edits don't re-upload.)
 
 ## Roles
 

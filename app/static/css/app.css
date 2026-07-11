@@ -443,6 +443,16 @@ h1, h2, h3 { margin: 0; }
 .add-line-btn { width: 100%; margin-top: 12px; border-style: dashed; color: var(--access); justify-content: center; }
 .add-line-btn:hover { border-color: var(--brand); }
 
+/* Google integrations (Settings → Google) */
+.drive-status { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.inline-form { display: inline; margin: 0; }
+.drive-status .chip .icon { width: .9em; height: .9em; }
+.drive-setup { margin: 14px 0; border: 1px solid var(--border); border-radius: 10px; padding: 0 14px; background: var(--panel-2); }
+.drive-setup > summary { cursor: pointer; padding: 12px 2px; font-weight: 600; font-size: 14px; list-style: none; }
+.drive-setup > summary::-webkit-details-marker { display: none; }
+.drive-setup[open] > summary { border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+.drive-setup input[readonly] { background: var(--panel); cursor: text; font-size: 12.5px; }
+
 /* ── receipt detail ───────────────────────────────────────────────────── */
 .detail-cols { display: grid; grid-template-columns: 1fr 320px; gap: 18px; align-items: start; }
 .receipt-summary { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px; }
