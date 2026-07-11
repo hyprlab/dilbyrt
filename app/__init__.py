@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Dilbyrt application factory.
 
 A small Flask app for scanning, tracking and splitting business receipts.

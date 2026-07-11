@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Authentication: login, logout, Turnstile verification, brute-force lockout.
 
 Passwords use Werkzeug's PBKDF2 hashing. Cloudflare Turnstile is verified

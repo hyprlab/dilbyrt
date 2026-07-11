@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Inline SVG icon helper.
 
 Self-contained subset of Lucide (https://lucide.dev, ISC license). Each

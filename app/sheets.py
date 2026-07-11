@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Optional Google Sheets sync (service-account based).
 
 Dilbyrt ships with CSV + XLSX export out of the box — those import cleanly

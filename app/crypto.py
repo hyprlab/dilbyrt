@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Symmetric encryption for at-rest secrets (the Turnstile secret key).
 
 Adapted from the Trusted Servants Pro pattern. A single Fernet cipher is

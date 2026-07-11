@@ -25,7 +25,31 @@ language, auth model, and security posture with the Trusted Servants Pro app.
 - **Light / dark theme**, fully mobile-responsive, brute-force login lockout,
   CSRF protection, encrypted secret storage, and hardened security headers.
 
-## Quick start (Docker)
+## Run from Docker Hub (no build)
+
+The image is published as [`hyprlab/dilbyrt`](https://hub.docker.com/r/hyprlab/dilbyrt).
+You don't need to clone the repo — just grab the compose file and an env file:
+
+```bash
+curl -O https://raw.githubusercontent.com/hyprlab/dilbyrt/main/docker-compose.hub.yml
+curl -o .env https://raw.githubusercontent.com/hyprlab/dilbyrt/main/.env.example
+# edit .env: set DILBYRT_SECRET_KEY and DILBYRT_ADMIN_PASSWORD
+docker compose -f docker-compose.hub.yml up -d
+```
+
+Or run it directly:
+
+```bash
+docker run -d --name dilbyrt -p 8099:8000 -v "$PWD/data:/data" \
+  -e DILBYRT_SECRET_KEY="$(openssl rand -base64 48)" \
+  -e DILBYRT_ADMIN_PASSWORD=change-me \
+  -e DILBYRT_SECURE_COOKIES=0 \
+  hyprlab/dilbyrt:latest
+```
+
+Then open <http://localhost:8099> and sign in with the admin credentials.
+
+## Quick start (build from source)
 
 ```bash
 cp .env.example .env
@@ -33,7 +57,7 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-Then open <http://localhost:8095> and sign in with the admin credentials from
+Then open <http://localhost:8099> and sign in with the admin credentials from
 your `.env`. Change the password after first login (Users → your account).
 
 Data (SQLite DB + uploaded receipt images + the encryption key) lives in
@@ -112,3 +136,11 @@ sum correctly with a pivot table or `SUMIF`.
 Everything persistent is in `./data` (`dilbyrt.db`, `uploads/`, `dilbyrt.key`).
 Stop the container (or just copy live — SQLite tolerates it for small apps) and
 archive that directory.
+
+## License
+
+Dilbyrt is free software licensed under the **GNU Affero General Public
+License v3.0 or later** (AGPL-3.0-or-later). See [`LICENSE`](LICENSE) for the
+full text. In short: you may use, modify, and redistribute it, but if you run a
+modified version as a network service you must make your source available to
+its users.

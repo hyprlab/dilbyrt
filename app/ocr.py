@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Receipt OCR + field extraction.
 
 Runs Tesseract (via ``pytesseract``) over an uploaded receipt image and

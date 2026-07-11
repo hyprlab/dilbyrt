@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Server-side live search across receipts and business entities.
 
 A query is tokenised on whitespace; every token must match at least one

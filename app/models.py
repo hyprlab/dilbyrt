@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 """Database models for Dilbyrt — receipt & invoice tracking.
 
 SQLite via Flask-SQLAlchemy. The schema is intentionally small:
