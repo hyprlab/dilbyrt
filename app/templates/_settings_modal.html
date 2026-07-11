@@ -32,57 +32,31 @@
         </form>
       </div>
 
-      {# ── Google (Sheets + Drive) ─────────────────────────────────── #}
+      {# ── Google (Drive status + Sheets) ──────────────────────────── #}
       <div class="tab-panel" data-tab-panel="google" hidden>
-        {# Drive connection status/actions sit OUTSIDE the settings form
-           (a link can't live inside a form, and disconnect is its own form). #}
         <section class="settings-section">
           <h3>{{ icon('image') }} Google Drive backup</h3>
-          <p class="muted hint">When a new receipt is saved, its image is copied into a <strong>Dilbyrt</strong> folder on your Google Drive, under a subfolder per business — named <code>YYYY-MM-DD_business_vendor</code>. Split receipts are copied into every business's folder.</p>
-
-          {% if not drive_libs %}
-          <p class="muted"><span class="chip chip-muted">Unavailable</span> The Google client libraries aren't installed on this server.</p>
+          <p class="muted hint">When a user saves a new receipt, its image is copied into a <strong>Dilbyrt</strong> folder in <strong>that user's</strong> Google Drive, under a subfolder per business — named <code>YYYY-MM-DD_business_vendor</code>. Split receipts are copied into every business's folder.</p>
+          {% if drive_available %}
+          <p class="muted"><span class="chip chip-ok">{{ icon('check') }} Available</span> Each user connects their own Google Drive from their <a href="{{ url_for('main.account') }}">Account</a> page — one click, no setup.</p>
           {% else %}
-          <div class="drive-status">
-            {% if drive_connected %}
-            <span class="chip chip-ok">{{ icon('check') }} Connected{% if drive_email %} — {{ drive_email }}{% endif %}</span>
-            <form method="post" action="{{ url_for('main.google_disconnect') }}" class="inline-form">
-              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-              <button class="btn btn-sm" type="submit" onclick="return confirm('Disconnect Google Drive? Existing files in Drive are kept.')">Disconnect</button>
-            </form>
-            {% elif drive_configured %}
-            <a class="btn btn-primary btn-sm" href="{{ url_for('main.google_connect') }}">{{ icon('sheet') }}<span>Connect Google Drive</span></a>
-            {% else %}
-            <span class="muted">Enter your OAuth client ID + secret below and Save, then connect.</span>
-            {% endif %}
-          </div>
+          <p class="muted"><span class="chip chip-muted">Not configured</span> Set <code>DILBYRT_GOOGLE_CLIENT_ID</code> and <code>DILBYRT_GOOGLE_CLIENT_SECRET</code> on the server (one central OAuth client) to offer Drive backup. See the README.</p>
+          {% endif %}
+          <label><span>OAuth redirect URI <span class="muted">(register this once in Google Cloud)</span></span><input type="text" value="{{ drive_redirect_uri }}" readonly onclick="this.select()"></label>
+        </section>
 
-          <form method="post" action="{{ url_for('main.google_save') }}" class="form" style="margin-top:14px">
+        <section class="settings-section" style="border-bottom:0;">
+          <h3>{{ icon('sheet') }} Google Sheets sync</h3>
+          <form method="post" action="{{ url_for('main.google_save') }}" class="form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <label class="check switch-row"><input type="checkbox" name="google_drive_enabled" value="1" {{ 'checked' if site.google_drive_enabled }}><span>Back up new receipts to Google Drive</span></label>
-            <details class="drive-setup">
-              <summary>OAuth client setup {{ '· done' if drive_configured else '· required' }}</summary>
-              <p class="muted hint">In Google Cloud: enable the <strong>Drive API</strong>, configure the OAuth consent screen (add yourself as a test user), then create an <strong>OAuth client ID → Web application</strong> and add this exact redirect URI:</p>
-              <label><span>Authorized redirect URI <span class="muted">(copy into Google)</span></span><input type="text" value="{{ drive_redirect_uri }}" readonly onclick="this.select()"></label>
-              <p class="muted hint">Google requires HTTPS for this URI (except <code>localhost</code>).</p>
-              <label><span>OAuth client ID</span><input name="google_oauth_client_id" type="text" value="{{ site.google_oauth_client_id or '' }}" placeholder="…apps.googleusercontent.com"></label>
-              <label><span>OAuth client secret <span class="muted">(stored encrypted)</span></span><input name="google_oauth_client_secret" type="password" placeholder="{{ '•••••••• (set — leave blank to keep)' if has_drive_secret else 'GOCSPX-…' }}"></label>
-              {% if has_drive_secret %}<label class="check"><input type="checkbox" name="clear_google_secret" value="1"><span>Clear the stored secret</span></label>{% endif %}
-            </details>
-
-            <section class="settings-section" style="border-bottom:0; padding-top:16px;">
-              <h3>{{ icon('sheet') }} Google Sheets sync</h3>
-              {% if sheets_key_present %}
-              <p class="muted hint"><span class="chip chip-ok">Service account mounted</span> Paste the target sheet's ID, share it (Editor) with the service account, then use <em>Export → Push to Google Sheet</em>.</p>
-              {% else %}
-              <p class="muted hint">Optional. CSV/Excel export already opens cleanly in Google Sheets. For live push, mount a service-account key (see the README). Saved either way.</p>
-              {% endif %}
-              <label><span>Google Sheet ID</span><input name="google_sheet_id" type="text" value="{{ site.google_sheet_id or '' }}" placeholder="1AbC…the long id from the sheet URL"></label>
-            </section>
-
+            {% if sheets_key_present %}
+            <p class="muted hint"><span class="chip chip-ok">Service account mounted</span> Paste the target sheet's ID, share it (Editor) with the service account, then use <em>Export → Push to Google Sheet</em>.</p>
+            {% else %}
+            <p class="muted hint">Optional. CSV/Excel export already opens cleanly in Google Sheets. For live push, mount a service-account key (see the README). Saved either way.</p>
+            {% endif %}
+            <label><span>Google Sheet ID</span><input name="google_sheet_id" type="text" value="{{ site.google_sheet_id or '' }}" placeholder="1AbC…the long id from the sheet URL"></label>
             <div class="form-actions"><button class="btn btn-primary" type="submit">{{ icon('check') }}<span>Save Google settings</span></button></div>
           </form>
-          {% endif %}
         </section>
       </div>
 

@@ -43,13 +43,13 @@
     </nav>
 
     <div class="sidebar-footer">
-      <div class="user-chip">
+      <a class="user-chip" href="{{ url_for('main.account') }}" title="Your account">
         <span class="user-avatar">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
         <span class="user-meta">
           <span class="user-name">{{ current_user.name or current_user.username }}</span>
-          <span class="user-role">{{ current_user.role }}</span>
+          <span class="user-role">{{ current_user.role }}{% if my_drive_connected %} · {{ icon('check') }} Drive{% endif %}</span>
         </span>
-      </div>
+      </a>
       <div class="footer-actions">
         {% if is_admin %}
         <button type="button" class="icon-btn" data-open-modal="settings-modal" title="Settings" aria-label="Settings">{{ icon('settings') }}</button>

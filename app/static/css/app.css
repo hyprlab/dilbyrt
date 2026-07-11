@@ -99,7 +99,11 @@ h1, h2, h3 { margin: 0; }
 .sidebar nav a.active .icon { color: var(--access); }
 
 .sidebar-footer { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 8px; display: flex; flex-direction: column; gap: 10px; }
-.user-chip { display: flex; align-items: center; gap: 10px; padding: 0 4px; }
+.user-chip { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border-radius: 10px; color: var(--text); text-decoration: none; }
+a.user-chip:hover { background: var(--panel-2); text-decoration: none; }
+.user-role .icon { width: .85em; height: .85em; vertical-align: -.12em; color: var(--success); }
+.account-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+@media (max-width: 800px) { .account-cols { grid-template-columns: 1fr; } }
 .user-avatar { width: 34px; height: 34px; border-radius: 50%; flex: none; display: grid; place-items: center;
   background: var(--brand-soft); color: var(--access); font-weight: 700; font-size: 14px; }
 .user-avatar.sm { width: 26px; height: 26px; font-size: 12px; margin-right: 8px; vertical-align: -8px; }

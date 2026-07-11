@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Account · {{ site.site_name }}{% endblock %}
+{% block heading %}My account{% endblock %}
+{% block content %}
+<div class="account-cols">
+  <div class="card">
+    <div class="card-head"><h2>Profile</h2></div>
+    <dl class="meta-list">
+      <dt>Name</dt><dd>{{ current_user.name or '—' }}</dd>
+      <dt>Username</dt><dd>{{ current_user.username }}</dd>
+      <dt>Email</dt><dd>{{ current_user.email }}</dd>
+      <dt>Role</dt><dd><span class="chip chip-role chip-role-{{ current_user.role }}">{{ current_user.role }}</span></dd>
+    </dl>
+    {% if is_admin %}<p class="muted hint" style="margin-top:14px">Edit users under <button type="button" class="link-btn" data-open-modal="settings-modal">Settings → Users</button>.</p>{% endif %}
+  </div>
+
+  {% if can_edit %}
+  <div class="card">
+    <div class="card-head"><h2>{{ icon('image') }} Google Drive backup</h2></div>
+    <p class="muted hint">Connect your Google Drive and every receipt <strong>you</strong> save is copied into a <strong>Dilbyrt</strong> folder in your Drive, filed under a subfolder per business (<code>YYYY-MM-DD_business_vendor</code>). Receipts split across businesses land in each one's folder.</p>
+
+    {% if not drive_available %}
+    <p class="muted"><span class="chip chip-muted">Unavailable</span> Google Drive backup isn't set up on this server yet. Ask an admin to configure it.</p>
+    {% elif drive_connected %}
+    <div class="drive-status">
+      <span class="chip chip-ok">{{ icon('check') }} Connected{% if drive_email %} — {{ drive_email }}{% endif %}</span>
+      <form method="post" action="{{ url_for('main.account_google_disconnect') }}" class="inline-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-sm" type="submit" onclick="return confirm('Disconnect your Google Drive? Files already in Drive are kept.')">Disconnect</button>
+      </form>
+    </div>
+    <p class="muted hint" style="margin-top:12px">New receipts you save will back up to this account.</p>
+    {% else %}
+    <a class="btn btn-primary" href="{{ url_for('main.account_google_connect') }}">{{ icon('sheet') }}<span>Connect Google Drive</span></a>
+    <p class="muted hint" style="margin-top:12px">You'll be sent to Google to approve access. Dilbyrt only sees the folders and files it creates.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

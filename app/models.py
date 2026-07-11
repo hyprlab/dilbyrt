@@ -30,6 +30,13 @@ class User(UserMixin, db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     last_seen_at = db.Column(db.DateTime)
 
+    # Per-user Google Drive connection (OAuth). Refresh token is Fernet-
+    # encrypted at rest; root id caches this user's "Dilbyrt" folder. See
+    # app/drive.py.
+    drive_refresh_token_enc = db.Column(db.LargeBinary)
+    drive_account_email = db.Column(db.String(255))
+    drive_root_id = db.Column(db.String(128))
+
     def set_password(self, raw):
         self.password_hash = generate_password_hash(raw)
 
@@ -60,14 +67,8 @@ class SiteSetting(db.Model):
     # mounted and a target spreadsheet id is set — see app/sheets.py).
     google_sheet_id = db.Column(db.String(128))
 
-    # Optional Google Drive backup via OAuth (see app/drive.py). Client secret
-    # + refresh token are Fernet-encrypted at rest.
-    google_drive_enabled = db.Column(db.Boolean, nullable=False, default=False)
-    google_oauth_client_id = db.Column(db.String(255))
-    google_oauth_client_secret_enc = db.Column(db.LargeBinary)
-    google_drive_refresh_token_enc = db.Column(db.LargeBinary)
-    google_drive_account_email = db.Column(db.String(255))
-    google_drive_root_id = db.Column(db.String(128))   # cached "Dilbyrt" folder id
+    # Google Drive backup is per-user now (see User.drive_* + app/drive.py);
+    # the OAuth client is configured via env, not stored here.
 
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -91,7 +92,6 @@ class BusinessEntity(db.Model):
     name = db.Column(db.String(160), unique=True, nullable=False)
     color = db.Column(db.String(9), default="#0b5cff")   # chip colour, hex
     active = db.Column(db.Boolean, nullable=False, default=True)
-    drive_folder_id = db.Column(db.String(128))   # cached Google Drive subfolder id
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):

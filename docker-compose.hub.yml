@@ -23,6 +23,10 @@ services:
       - DILBYRT_ADMIN_PASSWORD=${DILBYRT_ADMIN_PASSWORD:?DILBYRT_ADMIN_PASSWORD must be set in .env}
       - DILBYRT_ADMIN_EMAIL=${DILBYRT_ADMIN_EMAIL:-admin@example.com}
       # - DILBYRT_GOOGLE_SA_KEY=/data/google_sa.json
+      # Per-user Google Drive backup (one central OAuth client for everyone):
+      # - DILBYRT_BASE_URL=https://dilbyrt.hyprlab.co
+      # - DILBYRT_GOOGLE_CLIENT_ID=...apps.googleusercontent.com
+      # - DILBYRT_GOOGLE_CLIENT_SECRET=GOCSPX-...
       # Cookies are served WITHOUT the Secure flag by default so the app works
       # over plain HTTP (e.g. http://<server-ip>:8099). Set to 1 when serving
       # Dilbyrt behind HTTPS (a reverse proxy such as Caddy/nginx/Cloudflare).

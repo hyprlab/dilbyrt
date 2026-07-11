@@ -107,15 +107,15 @@ def inject_globals():
         ctx["sheets_key_present"] = sheets_mod.sheets_available()
         ctx["login_bg_files"] = _login_bg_files()
         from . import drive as drive_mod
-        ctx["drive_libs"] = drive_mod.libs_available()
-        ctx["drive_configured"] = drive_mod.is_configured(site)
-        ctx["drive_connected"] = drive_mod.is_connected(site)
-        ctx["drive_email"] = site.google_drive_account_email if site else None
-        ctx["has_drive_secret"] = bool(site and site.google_oauth_client_secret_enc)
+        ctx["drive_available"] = drive_mod.is_available()
         try:
             ctx["drive_redirect_uri"] = drive_mod.redirect_uri()
         except Exception:
             ctx["drive_redirect_uri"] = ""
+    # Per-user Drive connection flag for the sidebar/account link (all users).
+    if getattr(current_user, "is_authenticated", False):
+        from . import drive as drive_mod
+        ctx["my_drive_connected"] = drive_mod.is_connected(current_user)
     return ctx
 
 
@@ -400,8 +400,8 @@ def _save_receipt(r):
     extra = ""
     if is_new:
         from . import drive as drive_mod
-        if drive_mod.is_active():
-            _n, dmsg = drive_mod.upload_receipt(r)
+        if drive_mod.is_available() and drive_mod.is_connected(current_user):
+            _n, dmsg = drive_mod.upload_receipt(r, current_user)
             if dmsg:
                 extra = " " + dmsg
     flash("Receipt saved." + extra, "success")
@@ -704,72 +704,71 @@ def settings():
     return redirect(url_for("main.index", settings="general"))
 
 
-# ── Google integrations (Sheets id + Drive OAuth) ─────────────────────────
+# ── Google Sheets settings (admin) ────────────────────────────────────────
 @bp.route("/settings/google", methods=["POST"])
 @role_required("admin")
 def google_save():
-    from .crypto import encrypt
-    from . import drive as drive_mod
     site = _site()
     site.google_sheet_id = _f("google_sheet_id") or None
-    site.google_oauth_client_id = _f("google_oauth_client_id") or None
-    secret = request.form.get("google_oauth_client_secret") or ""
-    if secret.strip():
-        site.google_oauth_client_secret_enc = encrypt(secret.strip())
-    elif request.form.get("clear_google_secret") == "1":
-        site.google_oauth_client_secret_enc = None
-    want = request.form.get("google_drive_enabled") == "1"
-    if want and not drive_mod.is_connected(site):
-        flash("Connect a Google account below before enabling Drive backup.", "warning")
-        site.google_drive_enabled = False
-    else:
-        site.google_drive_enabled = want
     db.session.commit()
     flash("Google settings saved.", "success")
     return redirect(url_for("main.index", settings="google"))
 
 
-@bp.route("/settings/google/connect")
-@role_required("admin")
-def google_connect():
+# ── Account + per-user Google Drive connection ────────────────────────────
+@bp.route("/account")
+@login_required
+def account():
     from . import drive as drive_mod
-    if not drive_mod.libs_available():
-        flash("The Google client libraries aren't installed on this server.", "danger")
-        return redirect(url_for("main.index", settings="google"))
-    if not drive_mod.is_configured():
-        flash("Enter your OAuth client ID and secret first, then Save.", "warning")
-        return redirect(url_for("main.index", settings="google"))
-    return redirect(drive_mod.authorize_url())
+    return render_template(
+        "account.html",
+        drive_available=drive_mod.is_available(),
+        drive_connected=drive_mod.is_connected(current_user),
+        drive_email=current_user.drive_account_email,
+    )
 
 
-@bp.route("/settings/google/callback")
-@role_required("admin")
-def google_callback():
+@bp.route("/account/google/connect")
+@role_required("editor")
+def account_google_connect():
+    import secrets as _secrets
+    from flask import session
     from . import drive as drive_mod
-    err = request.args.get("error")
-    if err:
-        flash(f"Google connection cancelled: {err}", "warning")
-        return redirect(url_for("main.index", settings="google"))
+    if not drive_mod.is_available():
+        flash("Google Drive backup isn't set up on this server yet.", "warning")
+        return redirect(url_for("main.account"))
+    state = _secrets.token_urlsafe(24)
+    session["drive_oauth_state"] = state
+    return redirect(drive_mod.authorize_url(state))
+
+
+@bp.route("/account/google/callback")
+@role_required("editor")
+def account_google_callback():
+    from flask import session
+    from . import drive as drive_mod
+    if request.args.get("error"):
+        flash(f"Google connection cancelled: {request.args['error']}", "warning")
+        return redirect(url_for("main.account"))
+    state = request.args.get("state")
+    if not state or state != session.pop("drive_oauth_state", None):
+        flash("The Google connection couldn't be verified — please try again.", "danger")
+        return redirect(url_for("main.account"))
     code = request.args.get("code")
     if not code:
-        return redirect(url_for("main.index", settings="google"))
-    ok, msg = drive_mod.exchange_code(code)
-    if ok:
-        # Auto-enable on a successful connect for a one-click experience.
-        site = _site()
-        site.google_drive_enabled = True
-        db.session.commit()
+        return redirect(url_for("main.account"))
+    ok, msg = drive_mod.exchange_code(current_user, code)
     flash(msg, "success" if ok else "danger")
-    return redirect(url_for("main.index", settings="google"))
+    return redirect(url_for("main.account"))
 
 
-@bp.route("/settings/google/disconnect", methods=["POST"])
-@role_required("admin")
-def google_disconnect():
+@bp.route("/account/google/disconnect", methods=["POST"])
+@role_required("editor")
+def account_google_disconnect():
     from . import drive as drive_mod
-    drive_mod.disconnect()
-    flash("Disconnected from Google Drive.", "success")
-    return redirect(url_for("main.index", settings="google"))
+    drive_mod.disconnect(current_user)
+    flash("Disconnected your Google Drive.", "success")
+    return redirect(url_for("main.account"))
 
 
 # ── login background images ──────────────────────────────────────────────

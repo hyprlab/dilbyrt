@@ -94,6 +94,9 @@ manual entry and the scan panel says so.
 | `DILBYRT_TRUSTED_PROXIES` | `1` | Reverse-proxy hop count for real client IPs. |
 | `DILBYRT_FERNET_KEY` | auto | Key for encrypting secrets; auto-generated in `./data` if unset. |
 | `DILBYRT_GOOGLE_SA_KEY` | — | Path to a Google service-account JSON key (enables live Sheets sync). |
+| `DILBYRT_BASE_URL` | — | Public base URL (e.g. `https://dilbyrt.example.com`); used to build the exact OAuth redirect URI for Drive. |
+| `DILBYRT_GOOGLE_CLIENT_ID` | — | Central OAuth client ID for per-user Google Drive backup. |
+| `DILBYRT_GOOGLE_CLIENT_SECRET` | — | Central OAuth client secret for Drive backup. |
 
 Turnstile keys are configured in-app under **Settings** (admin only), not via
 env — the secret key is stored encrypted at rest.
@@ -127,37 +130,49 @@ sum correctly with a pivot table or `SUMIF`.
 5. On the Receipts page, **Export → Push to Google Sheet** now writes the data
    into a `Receipts` tab you can edit from your Chromebook.
 
-## Google Drive backup of receipt images
+## Google Drive backup of receipt images (per-user)
 
-When a new receipt is saved, Dilbyrt can copy its image into your Google Drive,
-organised by business: a top-level **`Dilbyrt`** folder containing a subfolder
-per business entity, with files named
-`YYYY-MM-DD_business-entity-name_receipt-vendor.<ext>`. Receipts split across
-multiple businesses are copied into **each** business's folder.
+Each user can connect **their own** Google Drive with one click (**Account →
+Connect Google Drive**). When they save a new receipt, its image is copied into
+a top-level **`Dilbyrt`** folder in their Drive, under a subfolder per business,
+named `YYYY-MM-DD_business-entity-name_receipt-vendor.<ext>`. Receipts split
+across multiple businesses are copied into **each** business's folder.
 
-This uses **OAuth** (you connect your own Google account) rather than a service
-account — a service account has no personal-Drive storage and its uploads fail.
-The `drive.file` scope means Dilbyrt only ever sees the folders/files it
-creates, never the rest of your Drive.
+It uses **OAuth** (not a service account — those have no personal-Drive storage
+and their uploads fail), with the `drive.file` scope, so Dilbyrt only ever sees
+the folders/files it creates in each user's Drive.
 
-One-time setup (admin):
+### One-time server setup (operator)
+
+You register **one** central OAuth client; end-users never touch Google Cloud.
 
 1. In the [Google Cloud console](https://console.cloud.google.com/): create/pick
    a project → enable the **Google Drive API** → configure the **OAuth consent
-   screen** (User type *External*; add your Google account under *Test users*).
-2. **Credentials → Create credentials → OAuth client ID → Web application.**
-   Copy the **Authorized redirect URI** shown in Dilbyrt → **Settings → Google →
-   Google Drive backup → OAuth client setup** into the client's *Authorized
-   redirect URIs*. Google requires **HTTPS** for this URI (except `localhost`),
-   so Drive backup needs Dilbyrt served over HTTPS or accessed at `localhost`.
-3. Paste the **client ID** and **client secret** into that same panel and
-   **Save Google settings**.
-4. Click **Connect Google Drive** and approve. Tick **Back up new receipts to
-   Google Drive** (auto-enabled on connect).
+   screen** (User type *External*; add a privacy-policy URL if publishing).
+2. **Credentials → Create credentials → OAuth client ID → Web application.** Add
+   this exact **Authorized redirect URI**: `https://<your-domain>/account/google/callback`
+   (shown in Dilbyrt → **Settings → Google**). Google requires **HTTPS** here
+   (except `localhost`), so Drive backup needs Dilbyrt served over HTTPS.
+3. Provide the client to Dilbyrt via env (see `docker-compose.yml`):
 
-From then on, saving a new receipt uploads its image to the right folder(s). The
-backup is best-effort — if Drive is unreachable the receipt still saves and you
-get a warning. (Backup runs on receipt *creation*; edits don't re-upload.)
+   ```
+   DILBYRT_BASE_URL=https://your-domain
+   DILBYRT_GOOGLE_CLIENT_ID=…apps.googleusercontent.com
+   DILBYRT_GOOGLE_CLIENT_SECRET=GOCSPX-…
+   ```
+
+While the consent screen is in **Testing**, add each user as a *Test user*
+(max 100) — they'll see a one-time "unverified app" screen. Publishing the app
+removes that; because Dilbyrt only uses the non-sensitive `drive.file` scope you
+need Google's lightweight brand verification, **not** the costly restricted-scope
+security assessment.
+
+### For each user
+
+Open **Account** (click your name in the sidebar) → **Connect Google Drive** →
+approve. From then on, receipts *they* create back up to *their* Drive. Backup is
+best-effort (a Drive outage never blocks a save) and runs on receipt
+**creation** only (edits don't re-upload).
 
 ## Roles
 
