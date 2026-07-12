@@ -181,17 +181,97 @@ def create_app():
         return render_template("404.html"), 404
 
     with app.app_context():
-        from sqlalchemy.exc import OperationalError
-        try:
-            db.create_all()
-        except OperationalError as e:
-            if "already exists" not in str(e).lower():
-                raise
-        _migrate_columns(app)
-        _seed_site(app)
-        _seed_admin(app)
+        # Serialize boot DDL/seeding across gunicorn workers with an exclusive
+        # file lock, so multi-step migrations (e.g. the business_entity rebuild)
+        # can't race each other and corrupt the schema.
+        import fcntl
+        lock_path = os.path.join(data_dir, ".dilbyrt-migrate.lock")
+        with open(lock_path, "w") as _lock:
+            try:
+                fcntl.flock(_lock, fcntl.LOCK_EX)
+            except OSError:
+                pass
+            from sqlalchemy.exc import OperationalError
+            try:
+                db.create_all()
+            except OperationalError as e:
+                if "already exists" not in str(e).lower():
+                    raise
+            _migrate_columns(app)
+            _migrate_entity_owner(app)
+            _seed_site(app)
+            _seed_admin(app)
 
     return app
+
+
+def _migrate_entity_owner(app):
+    """Move business_entity to per-user ownership: add owner_id and replace the
+    old global UNIQUE(name) with UNIQUE(owner_id, name). Pre-existing shared
+    businesses are assigned to the first admin. SQLite can't drop a column-level
+    UNIQUE without rebuilding the table, so we do that once. Idempotent and
+    self-healing — recovers rows from a leftover business_entity_old if a prior
+    run was interrupted."""
+    from sqlalchemy import text
+
+    def _create_new(conn):
+        conn.execute(text(
+            'CREATE TABLE business_entity ('
+            ' id INTEGER NOT NULL PRIMARY KEY,'
+            ' name VARCHAR(160) NOT NULL,'
+            ' color VARCHAR(9),'
+            ' active BOOLEAN NOT NULL DEFAULT 1,'
+            ' owner_id INTEGER REFERENCES "user"(id),'
+            ' created_at DATETIME,'
+            ' CONSTRAINT uq_entity_owner_name UNIQUE (owner_id, name))'))
+
+    def _default_owner(conn):
+        row = (conn.execute(text('SELECT id FROM "user" WHERE role=\'admin\' ORDER BY id LIMIT 1')).fetchone()
+               or conn.execute(text('SELECT id FROM "user" ORDER BY id LIMIT 1')).fetchone())
+        return row[0] if row else None
+
+    try:
+        with db.engine.begin() as conn:
+            tables = {r[0] for r in conn.execute(text(
+                "SELECT name FROM sqlite_master WHERE type='table'"))}
+            has_new = ("business_entity" in tables and "owner_id" in
+                       {r[1] for r in conn.execute(text("PRAGMA table_info(business_entity)"))})
+            has_old = "business_entity_old" in tables
+
+            if has_new and not has_old:
+                return  # already migrated cleanly
+
+            if has_old:
+                # Recover from an interrupted/raced prior run.
+                if not has_new:
+                    if "business_entity" in tables:
+                        conn.execute(text("DROP TABLE business_entity"))
+                    _create_new(conn)
+                ocols = {r[1] for r in conn.execute(text("PRAGMA table_info(business_entity_old)"))}
+                owner_col = "owner_id" if "owner_id" in ocols else "NULL"
+                conn.execute(text(
+                    f"INSERT OR IGNORE INTO business_entity (id, name, color, active, owner_id, created_at) "
+                    f"SELECT id, name, color, active, {owner_col}, created_at FROM business_entity_old"))
+                owner = _default_owner(conn)
+                if owner is not None:
+                    conn.execute(text("UPDATE business_entity SET owner_id=:o WHERE owner_id IS NULL"), {"o": owner})
+                conn.execute(text("DROP TABLE business_entity_old"))
+                app.logger.info("Recovered business_entity ownership migration")
+                return
+
+            # Plain old-schema table → rebuild once.
+            if "business_entity" in tables:
+                owner = _default_owner(conn)
+                conn.execute(text("ALTER TABLE business_entity RENAME TO business_entity_old"))
+                _create_new(conn)
+                conn.execute(text(
+                    "INSERT INTO business_entity (id, name, color, active, owner_id, created_at) "
+                    "SELECT id, name, color, active, :owner, created_at FROM business_entity_old"),
+                    {"owner": owner})
+                conn.execute(text("DROP TABLE business_entity_old"))
+                app.logger.info("Migrated business_entity to per-user ownership (owner=%s)", owner)
+    except Exception:
+        app.logger.exception("business_entity ownership migration failed")
 
 
 def _migrate_columns(app):

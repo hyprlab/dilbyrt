@@ -174,11 +174,20 @@ approve. From then on, receipts *they* create back up to *their* Drive. Backup i
 best-effort (a Drive outage never blocks a save) and runs on receipt
 **creation** only (edits don't re-upload).
 
+## Per-user data isolation
+
+Each user has a private workspace: they see only **their own** receipts and
+businesses, and can't view or reference anyone else's. Two users can even have
+businesses with the same name. **Admins are the exception** — an admin sees and
+can manage every user's receipts and businesses (plus users and settings).
+
 ## Roles
 
-- **Viewer** — browse receipts and run exports.
-- **Editor** — plus create/edit/delete receipts and businesses.
-- **Admin** — plus manage users and settings.
+- **Viewer** — browse *their own* receipts and run exports.
+- **Editor** — plus create/edit/delete *their own* receipts and businesses,
+  and connect their own Google Drive.
+- **Admin** — sees/manages **everything** (all users' receipts and businesses),
+  plus manages users and site settings.
 
 ## Backups
 

@@ -83,8 +83,47 @@ def _save_upload(file_storage):
     return stored
 
 
-def _active_entities():
-    return BusinessEntity.query.filter_by(active=True).order_by(BusinessEntity.name).all()
+# ── per-user data isolation ───────────────────────────────────────────────
+# Every user sees only their own receipts + businesses; admins see everything.
+def _is_admin():
+    return user_meets_role(current_user, "admin")
+
+
+def _receipts_q():
+    q = Receipt.query
+    if not _is_admin():
+        q = q.filter(Receipt.created_by == current_user.id)
+    return q
+
+
+def _entities_q():
+    q = BusinessEntity.query
+    if not _is_admin():
+        q = q.filter(BusinessEntity.owner_id == current_user.id)
+    return q
+
+
+def _own_receipt_or_404(rid):
+    r = db.session.get(Receipt, rid)
+    if not r or (not _is_admin() and r.created_by != current_user.id):
+        abort(404)
+    return r
+
+
+def _own_entity_or_404(eid):
+    e = db.session.get(BusinessEntity, eid)
+    if not e or (not _is_admin() and e.owner_id != current_user.id):
+        abort(404)
+    return e
+
+
+def _form_entities(receipt=None):
+    """Active businesses to offer on a receipt form — those of the receipt's
+    owner (so an admin editing someone else's receipt still sees valid
+    businesses), or the current user's when creating."""
+    owner = receipt.created_by if receipt else current_user.id
+    return (BusinessEntity.query.filter_by(owner_id=owner, active=True)
+            .order_by(BusinessEntity.name).all())
 
 
 # ── template context ─────────────────────────────────────────────────────
@@ -149,9 +188,9 @@ def _touch_last_seen():
 @bp.route("/")
 @login_required
 def index():
-    receipts = Receipt.query.all()
+    receipts = _receipts_q().all()
     total_spend = sum(r.grand_total or 0 for r in receipts)
-    entities = BusinessEntity.query.order_by(BusinessEntity.name).all()
+    entities = _entities_q().order_by(BusinessEntity.name).all()
 
     # Per-entity totals across every receipt's allocation.
     per_entity = {e.id: 0.0 for e in entities}
@@ -167,7 +206,7 @@ def index():
         [{"entity": e, "total": round(per_entity.get(e.id, 0.0), 2)} for e in entities],
         key=lambda x: x["total"], reverse=True)
 
-    recent = (Receipt.query
+    recent = (_receipts_q()
               .order_by(Receipt.created_at.desc())
               .limit(8).all())
 
@@ -190,7 +229,7 @@ def receipts():
     q = (request.args.get("q") or "").strip()
     entity_id = request.args.get("entity", type=int)
 
-    query = Receipt.query
+    query = _receipts_q()
     if q:
         from .search import _match, tokenize
         toks = tokenize(q)
@@ -207,7 +246,7 @@ def receipts():
 
     return render_template(
         "receipts.html", receipts=rows, q=q,
-        entities=BusinessEntity.query.order_by(BusinessEntity.name).all(),
+        entities=_entities_q().order_by(BusinessEntity.name).all(),
         active_entity=entity_id)
 
 
@@ -229,7 +268,7 @@ def receipt_new():
         ocr_text = data.get("text", "")
     return render_template(
         "receipt_form.html", receipt=None, prefill=prefill, ocr_text=ocr_text,
-        stored_image=stored, entities=_active_entities(),
+        stored_image=stored, entities=_form_entities(),
         ocr_available=ocr_mod.ocr_available())
 
 
@@ -310,16 +349,19 @@ def receipt_scan_ajax():
 @bp.route("/receipts/<int:rid>")
 @login_required
 def receipt_detail(rid):
-    r = db.session.get(Receipt, rid) or abort(404)
-    entities = {e.id: e for e in BusinessEntity.query.all()}
+    r = _own_receipt_or_404(rid)
+    allocations = r.entity_allocations()
+    ref_ids = set(allocations.keys()) | {it.entity_id for it in r.items if it.entity_id}
+    entities = {e.id: e for e in
+                BusinessEntity.query.filter(BusinessEntity.id.in_(ref_ids or {0})).all()}
     return render_template("receipt_detail.html", r=r, entities=entities,
-                           allocations=r.entity_allocations())
+                           allocations=allocations)
 
 
 @bp.route("/receipts/<int:rid>/edit", methods=["GET", "POST"])
 @role_required("editor")
 def receipt_edit(rid):
-    r = db.session.get(Receipt, rid) or abort(404)
+    r = _own_receipt_or_404(rid)
     if request.method == "POST":
         return _save_receipt(r)
     prefill = {
@@ -333,13 +375,19 @@ def receipt_edit(rid):
     }
     return render_template(
         "receipt_form.html", receipt=r, prefill=prefill, ocr_text=r.ocr_text or "",
-        stored_image=r.image_filename, entities=_active_entities(),
+        stored_image=r.image_filename, entities=_form_entities(r),
         ocr_available=ocr_mod.ocr_available())
 
 
 def _save_receipt(r):
     """Shared create/update handler. Reads the form into ``r`` and commits."""
     is_new = r.id is None
+    if is_new:
+        r.created_by = current_user.id
+    # Only the owner's businesses may be referenced (per-user isolation).
+    owner_id = r.created_by or current_user.id
+    valid_ids = {e.id for e in
+                 BusinessEntity.query.filter_by(owner_id=owner_id).all()}
     r.vendor_name = _f("vendor_name")
     r.purchased_at = _parse_dt(request.form.get("purchased_at"))
     r.city = _f("city")
@@ -355,11 +403,13 @@ def _save_receipt(r):
         r.tax_rate = None
     r.notes = _f("notes")
     r.split_mode = _f("split_mode", "single") or "single"
-    r.entity_id = request.form.get("entity_id", type=int)
-    r.split_entity_ids = ",".join(request.form.getlist("split_entity_ids"))
+    ent_id = request.form.get("entity_id", type=int)
+    r.entity_id = ent_id if ent_id in valid_ids else None
+    r.split_entity_ids = ",".join(
+        s for s in request.form.getlist("split_entity_ids")
+        if s.isdigit() and int(s) in valid_ids)
 
     if is_new:
-        r.created_by = current_user.id
         r.image_filename = _f("stored_image") or None
         r.ocr_text = request.form.get("ocr_text") or None
         db.session.add(r)
@@ -390,7 +440,7 @@ def _save_receipt(r):
         except ValueError:
             cost = 0.0
         eid = None
-        if i < len(ent_ids) and ent_ids[i].strip().isdigit():
+        if i < len(ent_ids) and ent_ids[i].strip().isdigit() and int(ent_ids[i]) in valid_ids:
             eid = int(ent_ids[i])
         r.items.append(ReceiptItem(description=desc[:300], qty=qty, cost=cost,
                                    entity_id=eid))
@@ -413,7 +463,7 @@ def _save_receipt(r):
 @bp.route("/receipts/<int:rid>/delete", methods=["POST"])
 @role_required("editor")
 def receipt_delete(rid):
-    r = db.session.get(Receipt, rid) or abort(404)
+    r = _own_receipt_or_404(rid)
     # Remove the stored image file too (best-effort).
     if r.image_filename:
         try:
@@ -436,9 +486,9 @@ def upload(filename):
 @bp.route("/entities", methods=["GET"])
 @login_required
 def entities():
-    rows = BusinessEntity.query.order_by(BusinessEntity.name).all()
+    rows = _entities_q().order_by(BusinessEntity.name).all()
     # Totals per entity for context.
-    receipts = Receipt.query.all()
+    receipts = _receipts_q().all()
     totals = {e.id: 0.0 for e in rows}
     for rec in receipts:
         for eid, amt in rec.entity_allocations().items():
@@ -454,10 +504,12 @@ def entity_new():
     if not name:
         flash("Enter a business name.", "warning")
         return redirect(url_for("main.entities"))
-    if BusinessEntity.query.filter(db.func.lower(BusinessEntity.name) == name.lower()).first():
-        flash("That business already exists.", "warning")
+    if (BusinessEntity.query.filter_by(owner_id=current_user.id)
+            .filter(db.func.lower(BusinessEntity.name) == name.lower()).first()):
+        flash("You already have a business with that name.", "warning")
         return redirect(url_for("main.entities"))
-    db.session.add(BusinessEntity(name=name[:160], color=_f("color", "#0b5cff") or "#0b5cff"))
+    db.session.add(BusinessEntity(name=name[:160], owner_id=current_user.id,
+                                  color=_f("color", "#0b5cff") or "#0b5cff"))
     db.session.commit()
     flash("Business added.", "success")
     return redirect(url_for("main.entities"))
@@ -466,7 +518,7 @@ def entity_new():
 @bp.route("/entities/<int:eid>/edit", methods=["POST"])
 @role_required("editor")
 def entity_edit(eid):
-    e = db.session.get(BusinessEntity, eid) or abort(404)
+    e = _own_entity_or_404(eid)
     e.name = _f("name", e.name)[:160] or e.name
     e.color = _f("color", e.color) or e.color
     e.active = request.form.get("active") == "1"
@@ -478,7 +530,7 @@ def entity_edit(eid):
 @bp.route("/entities/<int:eid>/delete", methods=["POST"])
 @role_required("editor")
 def entity_delete(eid):
-    e = db.session.get(BusinessEntity, eid) or abort(404)
+    e = _own_entity_or_404(eid)
     db.session.delete(e)
     db.session.commit()
     flash("Business deleted. Receipts previously billed to it are now unassigned.",
@@ -493,7 +545,7 @@ def api_search():
     raw = (request.args.get("q") or "").strip()
     if len(raw) < 2:
         return jsonify(query=raw, total=0, sections=[])
-    sections = search_sections(raw, per_section=8)
+    sections = search_sections(raw, per_section=8, owner_id=_search_owner())
     total = sum(len(s["items"]) for s in sections)
     return jsonify(query=raw, total=total, sections=sections)
 
@@ -502,9 +554,15 @@ def api_search():
 @login_required
 def search_page():
     raw = (request.args.get("q") or "").strip()
-    sections = search_sections(raw, per_section=100) if len(raw) >= 2 else []
+    sections = (search_sections(raw, per_section=100, owner_id=_search_owner())
+                if len(raw) >= 2 else [])
     total = sum(len(s["items"]) for s in sections)
     return render_template("search_results.html", q=raw, sections=sections, total=total)
+
+
+def _search_owner():
+    """None for admins (search all), else the current user's id."""
+    return None if _is_admin() else current_user.id
 
 
 # ── exports ──────────────────────────────────────────────────────────────
@@ -517,7 +575,7 @@ def _export_rows():
               "Tax", "Grand Total", "Allocated to Business", "Split Mode",
               "Currency", "Notes"]
     rows = []
-    for r in Receipt.query.order_by(
+    for r in _receipts_q().order_by(
             Receipt.purchased_at.desc().nullslast(), Receipt.created_at.desc()).all():
         when = r.purchased_at.strftime("%Y-%m-%d %H:%M") if r.purchased_at else ""
         alloc = r.entity_allocations()

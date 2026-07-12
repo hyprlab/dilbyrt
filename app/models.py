@@ -87,12 +87,19 @@ class LoginFailure(db.Model):
 
 
 class BusinessEntity(db.Model):
-    """A business a receipt (or individual line item) is billed to."""
+    """A business a receipt (or individual line item) is billed to. Owned by a
+    single user — data is isolated per user (see owner_id)."""
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(160), unique=True, nullable=False)
+    name = db.Column(db.String(160), nullable=False)
     color = db.Column(db.String(9), default="#0b5cff")   # chip colour, hex
     active = db.Column(db.Boolean, nullable=False, default=True)
+    owner_id = db.Column(db.Integer, db.ForeignKey("user.id"), index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+
+    # A user can't have two businesses with the same name; different users can.
+    __table_args__ = (
+        db.UniqueConstraint("owner_id", "name", name="uq_entity_owner_name"),
+    )
 
     def __repr__(self):
         return f"<BusinessEntity {self.name}>"
