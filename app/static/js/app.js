@@ -62,7 +62,15 @@
     if (!document.querySelector(".modal.open")) document.body.style.overflow = "";
   }
   document.querySelectorAll("[data-open-modal]").forEach(function (el) {
-    el.addEventListener("click", function (e) { e.preventDefault(); openModal(el.dataset.openModal); });
+    el.addEventListener("click", function (e) {
+      e.preventDefault();
+      openModal(el.dataset.openModal);
+      if (el.dataset.openTab) {
+        var m = document.getElementById(el.dataset.openModal);
+        var tabs = m && m.querySelector(".modal-tabs");
+        if (tabs) activateTab(tabs, el.dataset.openTab);
+      }
+    });
   });
   document.querySelectorAll(".modal").forEach(function (m) {
     m.querySelectorAll("[data-close]").forEach(function (el) {

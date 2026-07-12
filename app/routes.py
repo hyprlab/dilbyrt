@@ -100,6 +100,13 @@ def inject_globals():
     }
     # The Settings/Users popup is rendered into every admin page's shell, so
     # its data rides along in the shared context (only queried for admins).
+    # The Settings popup (incl. the everyone-visible Account tab) renders into
+    # every page's shell, so its data rides along in the shared context.
+    if getattr(current_user, "is_authenticated", False):
+        from . import drive as drive_mod
+        ctx["drive_available"] = drive_mod.is_available()
+        ctx["my_drive_connected"] = drive_mod.is_connected(current_user)
+        ctx["my_drive_email"] = getattr(current_user, "drive_account_email", None)
     if is_admin:
         ctx["settings_users"] = User.query.order_by(User.username).all()
         ctx["settings_roles"] = ROLE_TIERS
@@ -107,15 +114,10 @@ def inject_globals():
         ctx["sheets_key_present"] = sheets_mod.sheets_available()
         ctx["login_bg_files"] = _login_bg_files()
         from . import drive as drive_mod
-        ctx["drive_available"] = drive_mod.is_available()
         try:
             ctx["drive_redirect_uri"] = drive_mod.redirect_uri()
         except Exception:
             ctx["drive_redirect_uri"] = ""
-    # Per-user Drive connection flag for the sidebar/account link (all users).
-    if getattr(current_user, "is_authenticated", False):
-        from . import drive as drive_mod
-        ctx["my_drive_connected"] = drive_mod.is_connected(current_user)
     return ctx
 
 
@@ -719,13 +721,9 @@ def google_save():
 @bp.route("/account")
 @login_required
 def account():
-    from . import drive as drive_mod
-    return render_template(
-        "account.html",
-        drive_available=drive_mod.is_available(),
-        drive_connected=drive_mod.is_connected(current_user),
-        drive_email=current_user.drive_account_email,
-    )
+    # Account now lives in the Settings popup — bounce to the dashboard with
+    # the modal opened on the Account tab (covers stale links + OAuth returns).
+    return redirect(url_for("main.index", settings="account"))
 
 
 @bp.route("/account/google/connect")

@@ -1,21 +1,60 @@
-{# Admin-only tabbed Settings popup, opened from the sidebar footer gear. #}
+{# Tabbed popup: an Account tab for everyone + admin-only settings tabs.
+   Opened from the sidebar user chip (Account) or the footer gear (General). #}
 <div class="modal modal-lg" id="settings-modal" aria-hidden="true">
   <div class="modal-backdrop" data-close></div>
-  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Settings">
+  <div class="modal-panel" role="dialog" aria-modal="true" aria-label="Account and settings">
     <div class="modal-head">
-      <h2>{{ icon('settings') }} Settings</h2>
+      <h2>{{ icon('settings') }} {{ 'Settings' if is_admin else 'Account' }}</h2>
       <button class="icon-btn" data-close aria-label="Close">{{ icon('x') }}</button>
     </div>
     <div class="modal-tabs" role="tablist">
-      <button type="button" class="modal-tab active" data-tab="general" role="tab">General</button>
+      <button type="button" class="modal-tab active" data-tab="account" role="tab">{{ icon('user') }} Account</button>
+      {% if is_admin %}
+      <button type="button" class="modal-tab" data-tab="general" role="tab">General</button>
       <button type="button" class="modal-tab" data-tab="google" role="tab">{{ icon('sheet') }} Google</button>
       <button type="button" class="modal-tab" data-tab="login" role="tab">{{ icon('image') }} Login</button>
       <button type="button" class="modal-tab" data-tab="users" role="tab">{{ icon('users') }} Users</button>
+      {% endif %}
     </div>
     <div class="modal-body">
 
+      {# ── Account (everyone) ──────────────────────────────────────── #}
+      <div class="tab-panel" data-tab-panel="account">
+        <section class="settings-section">
+          <h3>Profile</h3>
+          <dl class="meta-list">
+            <dt>Name</dt><dd>{{ current_user.name or '—' }}</dd>
+            <dt>Username</dt><dd>{{ current_user.username }}</dd>
+            <dt>Email</dt><dd>{{ current_user.email }}</dd>
+            <dt>Role</dt><dd><span class="chip chip-role chip-role-{{ current_user.role }}">{{ current_user.role }}</span></dd>
+          </dl>
+        </section>
+        {% if can_edit %}
+        <section class="settings-section" style="border-bottom:0;">
+          <h3>{{ icon('image') }} Google Drive backup</h3>
+          <p class="muted hint">Connect your Google Drive and every receipt <strong>you</strong> save is copied into a <strong>Dilbyrt</strong> folder in your Drive, filed under a subfolder per business (<code>YYYY-MM-DD_business_vendor</code>). Split receipts land in each business's folder.</p>
+          {% if not drive_available %}
+          <p class="muted"><span class="chip chip-muted">Unavailable</span> Google Drive backup isn't set up on this server yet.{% if is_admin %} Configure it in the <strong>Google</strong> tab.{% else %} Ask an admin to configure it.{% endif %}</p>
+          {% elif my_drive_connected %}
+          <div class="drive-status">
+            <span class="chip chip-ok">{{ icon('check') }} Connected{% if my_drive_email %} — {{ my_drive_email }}{% endif %}</span>
+            <form method="post" action="{{ url_for('main.account_google_disconnect') }}" class="inline-form">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <button class="btn btn-sm" type="submit" onclick="return confirm('Disconnect your Google Drive? Files already in Drive are kept.')">Disconnect</button>
+            </form>
+          </div>
+          <p class="muted hint" style="margin-top:12px">New receipts you save will back up to this account.</p>
+          {% else %}
+          <a class="btn btn-primary" href="{{ url_for('main.account_google_connect') }}">{{ icon('sheet') }}<span>Connect Google Drive</span></a>
+          <p class="muted hint" style="margin-top:12px">You'll be sent to Google to approve access. Dilbyrt only sees the folders and files it creates.</p>
+          {% endif %}
+        </section>
+        {% endif %}
+      </div>
+
+      {% if is_admin %}
       {# ── General ─────────────────────────────────────────────────── #}
-      <div class="tab-panel" data-tab-panel="general">
+      <div class="tab-panel" data-tab-panel="general" hidden>
         <form method="post" action="{{ url_for('main.settings') }}" class="form">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
@@ -153,6 +192,7 @@
           {% endfor %}
         </div>
       </div>
+      {% endif %}
 
     </div>
   </div>

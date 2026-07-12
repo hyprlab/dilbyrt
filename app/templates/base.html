@@ -43,16 +43,16 @@
     </nav>
 
     <div class="sidebar-footer">
-      <a class="user-chip" href="{{ url_for('main.account') }}" title="Your account">
+      <button type="button" class="user-chip" data-open-modal="settings-modal" data-open-tab="account" title="Your account">
         <span class="user-avatar">{{ (current_user.name or current_user.username)[:1]|upper }}</span>
         <span class="user-meta">
           <span class="user-name">{{ current_user.name or current_user.username }}</span>
           <span class="user-role">{{ current_user.role }}{% if my_drive_connected %} · {{ icon('check') }} Drive{% endif %}</span>
         </span>
-      </a>
+      </button>
       <div class="footer-actions">
         {% if is_admin %}
-        <button type="button" class="icon-btn" data-open-modal="settings-modal" title="Settings" aria-label="Settings">{{ icon('settings') }}</button>
+        <button type="button" class="icon-btn" data-open-modal="settings-modal" data-open-tab="general" title="Settings" aria-label="Settings">{{ icon('settings') }}</button>
         {% endif %}
         <button type="button" class="icon-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
           <span class="theme-icon-light">{{ icon('sun') }}</span><span class="theme-icon-dark">{{ icon('moon') }}</span>
@@ -102,7 +102,7 @@
     </div>
   </div>
 </div>
-{% if is_admin %}{% include "_settings_modal.html" %}{% endif %}
+{% include "_settings_modal.html" %}
 <script>window.DILBYRT_SEARCH_URL = "{{ url_for('main.api_search') }}"; window.DILBYRT_SEARCH_PAGE = "{{ url_for('main.search_page') }}";</script>
 <script src="{{ url_for('static', filename='js/app.js', v=app_build_id) }}"></script>
 {% else %}
