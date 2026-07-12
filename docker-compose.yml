@@ -15,10 +15,10 @@ services:
       - DILBYRT_ADMIN_EMAIL=${DILBYRT_ADMIN_EMAIL:-admin@example.com}
       # - DILBYRT_GOOGLE_SA_KEY=/data/google_sa.json
       # Per-user Google Drive backup (one central OAuth client for everyone).
-      # Set your public base URL + OAuth client so users can one-click connect.
-      # - DILBYRT_BASE_URL=https://dilbyrt.hyprlab.co
-      # - DILBYRT_GOOGLE_CLIENT_ID=...apps.googleusercontent.com
-      # - DILBYRT_GOOGLE_CLIENT_SECRET=GOCSPX-...
+      # Values come from .env; blank/unset just disables the feature.
+      - DILBYRT_BASE_URL=${DILBYRT_BASE_URL:-}
+      - DILBYRT_GOOGLE_CLIENT_ID=${DILBYRT_GOOGLE_CLIENT_ID:-}
+      - DILBYRT_GOOGLE_CLIENT_SECRET=${DILBYRT_GOOGLE_CLIENT_SECRET:-}
       # Cookies are served WITHOUT the Secure flag by default so the app works
       # over plain HTTP (e.g. http://<server-ip>:8099). Browsers drop Secure
       # cookies over HTTP on non-localhost hosts, which breaks login with a
