@@ -51,8 +51,9 @@
         </span>
       </button>
       <div class="footer-actions">
-        {% if is_admin %}
-        <button type="button" class="icon-btn" data-open-modal="settings-modal" data-open-tab="general" title="Settings" aria-label="Settings">{{ icon('settings') }}</button>
+        {% if can_edit %}
+        <button type="button" class="icon-btn" data-open-modal="settings-modal" data-open-tab="{{ 'general' if is_admin else 'account' }}"
+                title="{{ 'Settings' if is_admin else 'Account settings' }}" aria-label="{{ 'Settings' if is_admin else 'Account settings' }}">{{ icon('settings') }}</button>
         {% endif %}
         <button type="button" class="icon-btn" id="theme-toggle" title="Toggle theme" aria-label="Toggle theme">
           <span class="theme-icon-light">{{ icon('sun') }}</span><span class="theme-icon-dark">{{ icon('moon') }}</span>
